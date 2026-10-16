@@ -1,4 +1,5 @@
 """Anthropic Messages API 形状的消息/工具类型（自实现 function calling 的协议载体）。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

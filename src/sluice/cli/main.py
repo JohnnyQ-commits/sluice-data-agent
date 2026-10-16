@@ -1,4 +1,5 @@
 """sluice CLI。P0 只有一个子命令：run（单次指令跑完整 ReAct 循环）。"""
+
 from __future__ import annotations
 
 import argparse
@@ -33,9 +34,7 @@ def _run(message: str) -> None:
 
     registry = ToolRegistry()
     registry.register(EchoTool())
-    runtime = ReActRuntime(
-        LLMClient(settings), registry, max_rounds=settings.react_max_rounds
-    )
+    runtime = ReActRuntime(LLMClient(settings), registry, max_rounds=settings.react_max_rounds)
 
     print(f"指令: {message}\n---")
     try:

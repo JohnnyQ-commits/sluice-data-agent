@@ -1,4 +1,5 @@
 """统一工具协议——内置工具、Skill 私有工具、MCP 外部工具都归一到这里。"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
