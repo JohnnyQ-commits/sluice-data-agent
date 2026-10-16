@@ -16,3 +16,6 @@ class Settings(BaseSettings):
 
     # ReAct 循环
     react_max_rounds: int = 10
+
+    # Web / 数据
+    demo_db_path: str = "data/demo.db"
