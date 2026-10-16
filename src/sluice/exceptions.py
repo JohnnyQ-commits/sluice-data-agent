@@ -6,6 +6,10 @@ class LLMTimeoutError(SluiceError):
     """LLM 请求超时（重试耗尽后）。"""
 
 
+class LLMConnectionError(SluiceError):
+    """LLM 网关连接失败（DNS/网络/拒绝连接等，重试耗尽后）。"""
+
+
 class LLMHTTPError(SluiceError):
     """LLM 网关返回非 2xx。"""
 

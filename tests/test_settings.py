@@ -4,7 +4,8 @@ from sluice.config.settings import Settings
 
 
 @pytest.fixture(autouse=True)
-def _clean_sluice_env(monkeypatch):
+def _clean_sluice_env(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)  # 隔离 cwd 相对的 .env
     for name in [
         "LLM_BASE_URL",
         "LLM_API_KEY",
@@ -23,6 +24,7 @@ def test_defaults():
     assert s.llm_model == "claude-sonnet-5-5"
     assert s.llm_timeout_seconds == 120.0
     assert s.llm_max_retries == 3
+    assert s.llm_max_tokens == 4096
     assert s.react_max_rounds == 10
 
 

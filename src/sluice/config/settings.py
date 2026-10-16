@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     llm_model: str = "claude-sonnet-5-5"
     llm_timeout_seconds: float = 120.0
     llm_max_retries: int = 3
+    llm_max_tokens: int = 4096
 
     # ReAct 循环
     react_max_rounds: int = 10

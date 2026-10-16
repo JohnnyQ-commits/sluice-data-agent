@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from ..config.settings import Settings
-from ..exceptions import LLMHTTPError, LLMTimeoutError
+from ..exceptions import LLMConnectionError, LLMHTTPError, LLMTimeoutError
 from .types import LLMResponse, Message, TextBlock, ToolDef, ToolUseBlock
 
 _RETRYABLE_STATUS = {429, 500, 502, 503, 529}
@@ -29,7 +29,7 @@ class LLMClient:
     ) -> LLMResponse:
         payload: dict[str, Any] = {
             "model": self._settings.llm_model,
-            "max_tokens": 4096,
+            "max_tokens": self._settings.llm_max_tokens,
             "messages": [self._encode_message(m) for m in messages],
         }
         if system:
@@ -54,7 +54,7 @@ class LLMClient:
                     json=payload,
                     timeout=self._settings.llm_timeout_seconds,
                 )
-            except httpx.TimeoutException as exc:
+            except httpx.TransportError as exc:
                 last_exc = exc
             else:
                 if resp.status_code == 200:
@@ -71,7 +71,11 @@ class LLMClient:
             raise LLMTimeoutError(
                 f"LLM 请求超时（重试 {self._settings.llm_max_retries} 次后放弃）"
             ) from last_exc
-        raise last_exc
+        if isinstance(last_exc, LLMHTTPError):
+            raise last_exc
+        raise LLMConnectionError(
+            f"LLM 网关连接失败（重试 {self._settings.llm_max_retries} 次后放弃）: {last_exc}"
+        ) from last_exc
 
     @staticmethod
     def _encode_message(m: Message) -> dict[str, Any]:

@@ -2,7 +2,7 @@ import httpx
 import pytest
 
 from sluice.config.settings import Settings
-from sluice.exceptions import LLMHTTPError, LLMTimeoutError
+from sluice.exceptions import LLMConnectionError, LLMHTTPError, LLMTimeoutError
 from sluice.llm.client import LLMClient
 from sluice.llm.types import Message, TextBlock, ToolDef
 
@@ -102,3 +102,51 @@ def test_chat_timeout_raises_after_retries(monkeypatch):
     with pytest.raises(LLMTimeoutError):
         LLMClient(make_settings()).chat([Message("user", [TextBlock("hi")])])
     assert len(calls) == 3  # max_retries=2 → 初次 + 2 次重试
+
+
+def test_chat_connect_error_raises_after_retries(monkeypatch):
+    calls = []
+
+    def fake_post(*a, **kw):
+        calls.append(1)
+        raise httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr("sluice.llm.client.httpx.post", fake_post)
+    monkeypatch.setattr("sluice.llm.client.time.sleep", lambda s: None)
+    with pytest.raises(LLMConnectionError):
+        LLMClient(make_settings()).chat([Message("user", [TextBlock("hi")])])
+    assert len(calls) == 3
+
+
+def test_chat_encodes_tool_blocks(monkeypatch):
+    from sluice.llm.types import ToolResultBlock, ToolUseBlock
+
+    captured = {}
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        captured.update(json=json)
+        return FakeResp(200, OK_TEXT)
+
+    monkeypatch.setattr("sluice.llm.client.httpx.post", fake_post)
+    LLMClient(make_settings()).chat(
+        [
+            Message("user", [TextBlock("hi")]),
+            Message("assistant", [TextBlock("调用中"), ToolUseBlock("tu_1", "echo", {"text": "x"})]),
+            Message("user", [ToolResultBlock("tu_1", "x", is_error=True)]),
+        ]
+    )
+    msgs = captured["json"]["messages"]
+    assert msgs[1]["content"][1] == {"type": "tool_use", "id": "tu_1", "name": "echo", "input": {"text": "x"}}
+    assert msgs[2]["content"][0] == {"type": "tool_result", "tool_use_id": "tu_1", "content": "x", "is_error": True}
+
+
+def test_chat_strips_trailing_slash_in_base_url(monkeypatch):
+    captured = {}
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        captured.update(url=url)
+        return FakeResp(200, OK_TEXT)
+
+    monkeypatch.setattr("sluice.llm.client.httpx.post", fake_post)
+    LLMClient(make_settings(llm_base_url="https://host.example/")).chat([Message("user", [TextBlock("hi")])])
+    assert captured["url"] == "https://host.example/v1/messages"
