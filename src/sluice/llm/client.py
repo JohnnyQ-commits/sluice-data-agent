@@ -49,7 +49,7 @@ class LLMClient:
         for attempt in range(self._settings.llm_max_retries + 1):
             try:
                 resp = httpx.post(
-                    f"{self._settings.llm_base_url}/v1/messages",
+                    f"{self._settings.llm_base_url.rstrip('/')}/v1/messages",
                     headers=headers,
                     json=payload,
                     timeout=self._settings.llm_timeout_seconds,
