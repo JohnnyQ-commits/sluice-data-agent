@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.util
 import itertools
+import logging
 import re
 import sys
 from dataclasses import dataclass, field
@@ -17,7 +18,16 @@ from pathlib import Path
 from ..tools.base import Tool
 from ..tools.registry import ToolRegistry
 
+logger = logging.getLogger(__name__)
+
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---", re.DOTALL)
+
+
+def _strip_paired_quotes(value: str) -> str:
+    """剥离成对引号（name: "x" 或 'x' → x）。"""
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        return value[1:-1]
+    return value
 
 
 def parse_skill_md(text: str) -> dict[str, str]:
@@ -29,7 +39,7 @@ def parse_skill_md(text: str) -> dict[str, str]:
     for line in m.group(1).splitlines():
         if ":" in line:
             key, _, value = line.partition(":")
-            meta[key.strip()] = value.strip()
+            meta[key.strip()] = _strip_paired_quotes(value.strip())
     return meta
 
 
@@ -70,12 +80,19 @@ class SkillLoader:
             md = d / "SKILL.md"
             if not md.is_file():
                 continue
-            meta = parse_skill_md(md.read_text(encoding="utf-8"))
-            if not meta.get("name"):
+            try:
+                # utf-8-sig：容忍编辑器写入的 UTF-8 BOM，否则 ﻿ 破坏 frontmatter 匹配
+                meta = parse_skill_md(md.read_text(encoding="utf-8-sig"))
+                if not meta.get("name"):
+                    continue
+                tools = (
+                    _load_tools(d / "tools.py", meta["name"])
+                    if (d / "tools.py").is_file()
+                    else []
+                )
+            except Exception as e:  # noqa: BLE001 - 单包异常不殃及其他 skill
+                logger.warning("Skill 包加载失败，已跳过 %s: %s", d.name, e)
                 continue
-            tools = (
-                _load_tools(d / "tools.py", meta["name"]) if (d / "tools.py").is_file() else []
-            )
             for t in tools:
                 t.name = f"{meta['name']}.{t.name}"
                 if registry is not None:

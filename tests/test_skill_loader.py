@@ -96,3 +96,53 @@ def test_loader_reload_fresh_registry_no_leak(tmp_path):
     packages = SkillLoader().load(skills_dir, registry2)
     assert len(packages) == 1
     assert registry2.get("weekly-report.render") is not None
+
+
+def test_loader_skmd_with_bom_still_parses(tmp_path, caplog):
+    """带 UTF-8 BOM 的 SKILL.md 不应导致 frontmatter 不匹配而静默丢包。"""
+    d = tmp_path / "skills" / "bommed"
+    d.mkdir(parents=True)
+    (d / "SKILL.md").write_text(SKILL_MD, encoding="utf-8-sig")
+    packages = SkillLoader().load(tmp_path / "skills", ToolRegistry())
+    assert len(packages) == 1
+    assert packages[0].name == "weekly-report"
+
+
+def test_loader_bad_tools_py_skips_only_that_skill(tmp_path, caplog):
+    """坏包（tools.py 语法错误）只跳过自身并打 warning，不殃及好包。"""
+    good = tmp_path / "skills" / "weekly-report"
+    good.mkdir(parents=True)
+    (good / "SKILL.md").write_text(SKILL_MD, encoding="utf-8")
+    (good / "tools.py").write_text(TOOLS_PY, encoding="utf-8")
+    bad = tmp_path / "skills" / "broken-skill"
+    bad.mkdir()
+    (bad / "SKILL.md").write_text(
+        "---\nname: broken-skill\ndescription: 坏包\n---\n", encoding="utf-8"
+    )
+    (bad / "tools.py").write_text("def oops(:\n", encoding="utf-8")
+    registry = ToolRegistry()
+    with caplog.at_level("WARNING"):
+        packages = SkillLoader().load(tmp_path / "skills", registry)
+    assert [p.name for p in packages] == ["weekly-report"]
+    assert registry.get("weekly-report.render") is not None
+    assert any("broken-skill" in r.message for r in caplog.records)
+
+
+def test_loader_all_bad_returns_empty_with_warning(tmp_path, caplog):
+    """全坏时返回 [] 且有 warning 记录。"""
+    bad = tmp_path / "skills" / "broken-skill"
+    bad.mkdir(parents=True)
+    (bad / "SKILL.md").write_text(
+        "---\nname: broken-skill\ndescription: 坏包\n---\n", encoding="utf-8"
+    )
+    (bad / "tools.py").write_text("TOOLS = None\nraise RuntimeError('boom')\n", encoding="utf-8")
+    with caplog.at_level("WARNING"):
+        packages = SkillLoader().load(tmp_path / "skills", ToolRegistry())
+    assert packages == []
+    assert len(caplog.records) >= 1
+
+
+def test_parse_skill_md_strips_paired_quotes():
+    meta = parse_skill_md('---\nname: "weekly-report"\ndescription: \'数据周报\'\n---\n')
+    assert meta["name"] == "weekly-report"
+    assert meta["description"] == "数据周报"
