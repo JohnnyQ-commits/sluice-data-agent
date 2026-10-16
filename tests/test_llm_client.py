@@ -51,6 +51,7 @@ def test_chat_builds_payload_and_parses_text(monkeypatch):
     assert resp.text == "你好" and resp.stop_reason == "end_turn"
     assert captured["url"].endswith("/v1/messages")
     assert captured["headers"]["x-api-key"] == "test-key"
+    assert captured["headers"]["authorization"] == "Bearer test-key"  # 自建网关只认此头
     assert captured["json"]["system"] == "你是一个测试助手"
     assert captured["json"]["tools"][0]["name"] == "echo"
     assert captured["json"]["messages"][0]["content"] == [{"type": "text", "text": "打个招呼"}]

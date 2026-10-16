@@ -37,8 +37,10 @@ class LLMClient:
         if tools:
             payload["tools"] = [t.to_api() for t in tools]
 
+        # token 同值双发：x-api-key（官方 API）+ Authorization: Bearer（自建网关只认此头）
         headers = {
             "x-api-key": self._settings.llm_api_key,
+            "authorization": f"Bearer {self._settings.llm_api_key}",
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         }
