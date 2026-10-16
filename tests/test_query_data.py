@@ -47,4 +47,26 @@ def test_row_cap(db_path):
     conn.commit()
     conn.close()
     result = QueryDataTool(db_path).execute({"sql": "select * from sales"})
-    assert result.content.count("\n") <= 51  # 表头 + 50 行
+    assert result.content.count("\n") == 51  # 表头 + 分隔 + 50 行
+    assert "仅展示前 50 行" in result.content
+
+
+def test_with_dml_rejected(db_path):
+    result = QueryDataTool(db_path).execute({"sql": "with x as (select 1) delete from sales"})
+    assert result.is_error
+    assert "只读" in result.content
+
+
+def test_pipe_in_value_escaped(db_path):
+    conn = sqlite3.connect(db_path)
+    conn.execute("insert into sales values (4, '北|京', 1.0)")
+    conn.commit()
+    conn.close()
+    result = QueryDataTool(db_path).execute({"sql": "select city from sales where id = 4"})
+    assert not result.is_error
+    assert "北\\|京" in result.content
+
+
+def test_multi_statement_rejected(db_path):
+    result = QueryDataTool(db_path).execute({"sql": "select 1; select 2"})
+    assert result.is_error
