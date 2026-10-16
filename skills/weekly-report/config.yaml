@@ -1,0 +1,3 @@
+# 数据周报 Skill 配置（P1 占位：demo 数据源固定为平台 demo_db_path）
+datasource: platform-demo
+params: {}
