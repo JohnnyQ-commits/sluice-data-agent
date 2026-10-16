@@ -38,10 +38,12 @@ class ScriptedClient:
 
 
 def test_loop_executes_tool_then_finishes():
-    client = ScriptedClient([
-        resp_tool("我调用 echo 工具", "tu_1", "echo", {"text": "hello sluice"}),
-        resp_text("echo 返回了 hello sluice"),
-    ])
+    client = ScriptedClient(
+        [
+            resp_tool("我调用 echo 工具", "tu_1", "echo", {"text": "hello sluice"}),
+            resp_text("echo 返回了 hello sluice"),
+        ]
+    )
     runtime = ReActRuntime(client, make_registry())
     final = runtime.run("帮我 echo 一下")
 
@@ -57,10 +59,12 @@ def test_loop_executes_tool_then_finishes():
 
 
 def test_loop_unknown_tool_feeds_error_back():
-    client = ScriptedClient([
-        resp_tool("调一个不存在的工具", "tu_1", "no_such_tool", {}),
-        resp_text("好的我换个说法"),
-    ])
+    client = ScriptedClient(
+        [
+            resp_tool("调一个不存在的工具", "tu_1", "no_such_tool", {}),
+            resp_text("好的我换个说法"),
+        ]
+    )
     runtime = ReActRuntime(client, make_registry())
     final = runtime.run("随便")
 
@@ -71,10 +75,12 @@ def test_loop_unknown_tool_feeds_error_back():
 
 
 def test_loop_records_trace():
-    client = ScriptedClient([
-        resp_tool("调用中", "tu_1", "echo", {"text": "x"}),
-        resp_text("完成"),
-    ])
+    client = ScriptedClient(
+        [
+            resp_tool("调用中", "tu_1", "echo", {"text": "x"}),
+            resp_text("完成"),
+        ]
+    )
     runtime = ReActRuntime(client, make_registry())
     runtime.run("trace 检查")
 
