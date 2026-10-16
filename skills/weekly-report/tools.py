@@ -43,14 +43,22 @@ class RenderReportTool(Tool):
         metrics = args.get("metrics")
         if not title or not period or not metrics:
             return ToolResult("title/period/metrics 均为必填", is_error=True)
+        if not isinstance(metrics, list):
+            return ToolResult("metrics 必须是数组", is_error=True)
+        for m in metrics:
+            if not isinstance(m, dict) or "name" not in m or "value" not in m:
+                return ToolResult("metrics 元素缺少 name/value", is_error=True)
 
         lines = [f"# {title}", "", f"**统计周期**：{period}", "", "## 核心指标", ""]
         for m in metrics:
             delta = m.get("delta")
+            has_delta = delta is not None and delta != ""
             lines.append(
-                f"- **{m['name']}**：{m['value']}" + (f"（环比 {delta}）" if delta else "")
+                f"- **{m['name']}**：{m['value']}" + (f"（环比 {delta}）" if has_delta else "")
             )
-        highlights = args.get("highlights") or []
+        highlights = args.get("highlights")
+        if highlights is not None and not isinstance(highlights, list):
+            return ToolResult("highlights 必须是数组", is_error=True)
         if highlights:
             lines += ["", "## 重点发现", ""]
             lines += [f"- {h}" for h in highlights]

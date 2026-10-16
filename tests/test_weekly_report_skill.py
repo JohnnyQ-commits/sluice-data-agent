@@ -41,3 +41,59 @@ def test_render_report_missing_required_field_is_error():
     registry = _load()
     result = registry.get("weekly-report.render_report").execute({"title": "只有标题"})
     assert result.is_error
+
+
+def test_render_report_empty_metrics_goes_required_error():
+    registry = _load()
+    result = registry.get("weekly-report.render_report").execute(
+        {"title": "周报", "period": "2026-10-12 ~ 2026-10-18", "metrics": []}
+    )
+    assert result.is_error
+
+
+def test_render_report_metric_element_missing_key_is_error():
+    registry = _load()
+    result = registry.get("weekly-report.render_report").execute(
+        {
+            "title": "周报",
+            "period": "2026-10-12 ~ 2026-10-18",
+            "metrics": [{"name": "客单价"}],
+        }
+    )
+    assert result.is_error
+    assert "metrics 元素缺少 name/value" in result.content
+
+
+def test_render_report_metrics_not_list_is_error():
+    registry = _load()
+    for bad in ("总销售额", 123, {"name": "总销售额", "value": "12.3万"}):
+        result = registry.get("weekly-report.render_report").execute(
+            {"title": "周报", "period": "2026-10-12 ~ 2026-10-18", "metrics": bad}
+        )
+        assert result.is_error, f"metrics={bad!r} 应报错"
+
+
+def test_render_report_highlights_not_list_is_error():
+    registry = _load()
+    result = registry.get("weekly-report.render_report").execute(
+        {
+            "title": "周报",
+            "period": "2026-10-12 ~ 2026-10-18",
+            "metrics": [{"name": "总销售额", "value": "12.3万"}],
+            "highlights": "数码品类环比大涨",
+        }
+    )
+    assert result.is_error
+
+
+def test_render_report_zero_delta_not_swallowed():
+    registry = _load()
+    result = registry.get("weekly-report.render_report").execute(
+        {
+            "title": "周报",
+            "period": "2026-10-12 ~ 2026-10-18",
+            "metrics": [{"name": "总销售额", "value": "12.3万", "delta": "0%"}],
+        }
+    )
+    assert not result.is_error
+    assert "（环比 0%）" in result.content
