@@ -1,3 +1,5 @@
+from typing import Any, ClassVar
+
 import pytest
 
 from sluice.tools.base import Tool, ToolResult
@@ -29,9 +31,9 @@ def test_registry_rejects_duplicate_name():
 
 def test_tool_is_abstract():
     class Incomplete(Tool):
-        name = "bad"
-        description = "缺 execute"
-        parameters = {}
+        name: ClassVar[str] = "bad"
+        description: ClassVar[str] = "缺 execute"
+        parameters: ClassVar[dict[str, Any]] = {}
 
     with pytest.raises(TypeError):
         Incomplete()  # 没实现 execute，应无法实例化
