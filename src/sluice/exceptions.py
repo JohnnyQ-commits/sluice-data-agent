@@ -21,3 +21,7 @@ class LLMHTTPError(SluiceError):
 
 class RoundsExhaustedError(SluiceError):
     """ReAct 循环超过轮次上限仍未产出最终回答。"""
+
+
+class BudgetExceededError(SluiceError):
+    """ReAct 循环超出 token 预算（终止级门禁）。"""
