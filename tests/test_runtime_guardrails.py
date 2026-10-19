@@ -288,3 +288,28 @@ def test_same_round_duplicate_tool_use_intercepted(tmp_path):
     assert len(g) == 1 and g[0]["gate"] == "behavior" and "同一轮内" in g[0]["reason"]
     audit_lines = (tmp_path / "a9" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
     assert [json.loads(line)["kind"] for line in audit_lines] == ["behavior_blocked"]
+
+
+def test_input_block_does_not_pollute_behavior_gate(tmp_path):
+    """混合门禁契约：同消息幻觉工具被 input 拦截 + 在册工具合法执行 → 不产生 behavior_blocked。
+
+    钉死 input 拦截不 claim、不污染行为门禁的当轮指纹登记。
+    """
+    rt, _ = _runtime(
+        [
+            LLMResponse(
+                content=[
+                    ToolUseBlock("t1", "ghost_tool", {"x": 1}),
+                    ToolUseBlock("t2", "demo.report", {"text": "y"}),
+                ],
+                stop_reason="tool_use",
+                usage={},
+            ),
+            _final("完成"),
+        ],
+        tmp_path,
+    )
+    events = _events_of(rt)
+    g = [e for e in events if e["type"] == "guardrail"]
+    assert len(g) == 1 and g[0]["gate"] == "input" and g[0]["action"] == "blocked"
+    assert all(e["gate"] != "behavior" for e in g)

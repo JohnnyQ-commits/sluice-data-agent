@@ -92,6 +92,17 @@ def test_commit_round_clears_round_keys():
     assert gate.check_call(tu) is not None  # commit 后 A 变成"上一轮"，再调被拦（既有语义）
 
 
+def test_same_round_aba_sequence():
+    """同轮 A→B→再调 A：_round_keys 是集合语义，不是只记最后一次调用的槽位。"""
+    gate = BehaviorGate(token_budget=0)
+    a = ToolUseBlock("t1", "demo.report", {"text": "a"})
+    b = ToolUseBlock("t2", "demo.report", {"text": "b"})
+    assert gate.check_call(a) is None  # 放行并 claim
+    assert gate.check_call(b) is None  # 放行并 claim
+    reason = gate.check_call(ToolUseBlock("t3", "demo.report", {"text": "a"}))
+    assert reason is not None and "同一轮内" in reason
+
+
 def test_ab_a_pattern_still_allowed():
     """A→B→A 隔轮重复仍放行（既有语义，留给 evals 观察是否收紧）。"""
     gate = BehaviorGate(token_budget=0)
