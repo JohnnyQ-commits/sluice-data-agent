@@ -77,6 +77,10 @@ def _web(args: argparse.Namespace) -> None:
 
 def _run(message: str) -> None:
     settings = Settings()
+    # audit 目录锚定 repo 根（main.py 在 src/sluice/cli/ 下，parents[3] = repo 根），防 cwd 漂移写散
+    settings = settings.model_copy(
+        update={"audit_dir": str(Path(__file__).resolve().parents[3] / "audit")}
+    )
     if not settings.llm_api_key:
         print("缺少 SLUICE_LLM_API_KEY（复制 .env.example 为 .env 并填写）", file=sys.stderr)
         sys.exit(1)

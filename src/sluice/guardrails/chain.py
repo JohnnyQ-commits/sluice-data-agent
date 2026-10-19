@@ -5,15 +5,21 @@ None 即关闭（kill switch）：ReActRuntime 接受 guardrails=None，行为�
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
 from ..config.settings import Settings
 from .base import AuditLog
 from .behavior_gate import BehaviorGate
 from .input_gate import InputGate
 from .output_gate import check_output
 
+if TYPE_CHECKING:
+    from ..skills.loader import SkillPackage
+
 
 class GuardrailChain:
-    def __init__(self, settings: Settings, packages=()):
+    def __init__(self, settings: Settings, packages: Iterable[SkillPackage] = ()):
         self.input_gate = InputGate()
         self.token_budget = settings.react_token_budget
         self.audit = AuditLog(settings.audit_dir)

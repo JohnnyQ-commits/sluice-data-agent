@@ -6,6 +6,7 @@ from typing import ClassVar
 import pytest
 
 from sluice.config.settings import Settings
+from sluice.exceptions import BudgetExceededError
 from sluice.guardrails.chain import GuardrailChain
 from sluice.llm.types import LLMResponse, TextBlock, ToolUseBlock
 from sluice.runtime.loop import ReActRuntime
@@ -33,6 +34,18 @@ class ScriptedClient:
     def chat(self, messages, system=None, tools=None):
         assert self._responses, "剧本耗尽：测试没预期到这次 chat 调用"
         return self._responses.pop(0)
+
+
+class RepairExplodesClient:
+    """前两轮按剧本出（工具调用 → final），自修轮 chat 抛异常（网关抖动模拟）。"""
+
+    def __init__(self, first, second):
+        self._script = [first, second]
+
+    def chat(self, messages, system=None, tools=None):
+        if self._script:
+            return self._script.pop(0)
+        raise RuntimeError("网关抖动")
 
 
 def _final(text, usage=None):
@@ -83,6 +96,8 @@ def test_repeated_call_interrupted(tmp_path):
     rt, _ = _runtime([_call("demo.report"), _call("demo.report"), _final("完成")], tmp_path)
     g = [e for e in _events_of(rt) if e["type"] == "guardrail"]
     assert any(e["gate"] == "behavior" and e["action"] == "blocked" for e in g)
+    audit_lines = (tmp_path / "audit" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line)["kind"] for line in audit_lines] == ["behavior_blocked"]
 
 
 def test_token_budget_exceeded_raises_with_error_event(tmp_path):
@@ -101,10 +116,12 @@ def test_token_budget_exceeded_raises_with_error_event(tmp_path):
     )
     rt = ReActRuntime(client, registry, max_rounds=5, guardrails=GuardrailChain(settings))
     events = []
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(BudgetExceededError) as exc_info:
         rt.run("go", on_event=events.append)
     assert "token 预算超限" in str(exc_info.value)
     assert [e["type"] for e in events][-1] == "error"
+    audit_lines = (tmp_path / "a2" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line)["kind"] for line in audit_lines] == ["budget_exceeded"]
 
 
 def test_output_gate_repair_success(tmp_path):
@@ -145,7 +162,7 @@ def test_output_gate_degraded_delivery(tmp_path):
     assert answer == "原稿"
     g = [e for e in events if e["type"] == "guardrail"]
     assert [e["action"] for e in g] == ["blocked", "degraded"]
-    assert events[-1]["type"] == "final"
+    assert events[-1]["type"] == "final" and events[-1]["answer"] == "原稿"
 
 
 def test_guardrails_disabled_is_kill_switch(tmp_path):
@@ -162,3 +179,45 @@ def test_guardrails_disabled_is_kill_switch(tmp_path):
     assert not [e for e in events if e["type"] == "guardrail"]
     obs_events = [e for e in events if e["type"] == "observation"]
     assert "未知工具" in obs_events[0]["observation"]
+
+
+def test_repair_chat_exception_degrades_to_original(tmp_path):
+    """自修轮 chat 网关异常 → 降级交付原稿 + 审计副本，用户端不悬挂。"""
+    registry = ToolRegistry()
+    registry.register(ReportTool())
+    settings = Settings(audit_dir=str(tmp_path / "a6"))
+    chain = GuardrailChain(settings)
+    chain._contracts = {"demo": ["核心指标"]}  # 测试直填契约
+    client = RepairExplodesClient(_call("demo.report"), _final("缺小节的原稿"))
+    rt = ReActRuntime(client, registry, max_rounds=5, guardrails=chain)
+    events = []
+    answer = rt.run("go", on_event=events.append)
+    assert answer == "缺小节的原稿"
+    g = [e for e in events if e["type"] == "guardrail"]
+    assert [e["action"] for e in g] == ["blocked", "degraded"]
+    assert "自修调用失败" in g[1]["reason"]
+    assert events[-1]["type"] == "final" and events[-1]["answer"] == "缺小节的原稿"
+    audit_lines = (tmp_path / "a6" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+    kinds = [json.loads(line)["kind"] for line in audit_lines]
+    assert kinds == ["output_rejected", "output_degraded"]
+
+
+def test_repair_round_tool_use_dropped_then_degraded(tmp_path):
+    """自修轮违规返回工具调用 → 丢弃留痕，只取文本复检；空文本复检不过 → 降级交付原稿。"""
+    registry = ToolRegistry()
+    registry.register(ReportTool())
+    settings = Settings(audit_dir=str(tmp_path / "a7"))
+    chain = GuardrailChain(settings)
+    chain._contracts = {"demo": ["核心指标"]}  # 测试直填契约
+    client = ScriptedClient([_call("demo.report"), _final("缺小节"), _call("demo.report")])
+    rt = ReActRuntime(client, registry, max_rounds=5, guardrails=chain)
+    events = []
+    answer = rt.run("go", on_event=events.append)
+    assert answer == "缺小节"  # 降级交付原稿
+    g = [e for e in events if e["type"] == "guardrail"]
+    assert [e["action"] for e in g] == ["blocked", "blocked", "degraded"]
+    assert "工具调用，已忽略" in g[1]["reason"]
+    assert events[-1]["type"] == "final" and events[-1]["answer"] == "缺小节"
+    audit_lines = (tmp_path / "a7" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+    kinds = [json.loads(line)["kind"] for line in audit_lines]
+    assert kinds == ["output_rejected", "repair_tool_use_dropped", "output_degraded"]

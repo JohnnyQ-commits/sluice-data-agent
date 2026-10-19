@@ -72,7 +72,7 @@ class ReActRuntime:
 
                 if not tool_uses:  # Final Answer → 拦截点③输出门禁 + 拦截点④自修
                     return self._deliver_output(
-                        messages, effective, local_trace, round_no, response, used_tools
+                        messages, effective, local_trace, round_no, response, used_tools, behavior
                     )
 
                 messages.append(Message("assistant", response.content))
@@ -82,8 +82,7 @@ class ReActRuntime:
                         effective,
                         {"type": "tool_call", "round": round_no, "name": tu.name, "args": tu.input},
                     )
-                    used_tools.append(tu.name)
-                    obs = self._execute_tool_gated(tu, behavior, effective, round_no)
+                    obs = self._execute_tool_gated(tu, behavior, effective, round_no, used_tools)
                     self._emit(
                         effective,
                         {
@@ -114,7 +113,11 @@ class ReActRuntime:
     def _pre_tool_check(
         self, tu: ToolUseBlock, behavior: BehaviorGate | None
     ) -> tuple[str, str, dict] | None:
-        """拦截点①输入门禁 + 拦截点②重复调用。返回 (gate, reason, detail) 或 None。"""
+        """拦截点①输入门禁 + 拦截点②重复调用。返回 (gate, reason, detail) 或 None。
+
+        input 必须先于 behavior：被拦调用的指纹会进下一轮比对基准（commit_round
+        收的是本轮全部 tool_uses），顺序颠倒会让重复判定吞掉输入拦截的原因。
+        """
         if self._guardrails is None:
             return None
         tool = self._registry.get(tu.name)
@@ -134,15 +137,19 @@ class ReActRuntime:
         behavior: BehaviorGate | None,
         effective: Callable[[dict], None] | None,
         round_no: int,
+        used_tools: list[str],
     ) -> ToolResultBlock:
-        """先过门禁再执行；被拦截则不执行，把拦截原因作为错误观察回喂模型自纠。"""
+        """先过门禁再执行；被拦截则不执行，把拦截原因作为错误观察回喂模型自纠。
+
+        used_tools 只在放行分支登记——幻觉/被拦的工具名不得向输出门禁归因契约。
+        """
         block = self._pre_tool_check(tu, behavior)
         if block is not None:
             gate, reason, detail = block
             self._emit(effective, guardrail_event(gate, "blocked", reason, round_no, **detail))
             self._audit(
                 {
-                    "kind": "input_blocked",
+                    "kind": f"{gate}_blocked",
                     "round": round_no,
                     "tool": tu.name,
                     **detail,
@@ -150,6 +157,7 @@ class ReActRuntime:
                 }
             )
             return ToolResultBlock(tu.id, f"[门禁拦截] {reason}", is_error=True)
+        used_tools.append(tu.name)
         return self._execute_tool(tu)
 
     def _deliver_output(
@@ -160,10 +168,13 @@ class ReActRuntime:
         round_no: int,
         response: LLMResponse,
         used_tools: list[str],
+        behavior: BehaviorGate | None,
     ) -> str:
         """拦截点③输出门禁 + 拦截点④恢复策略：定向自修一轮，复检通过才采用。
 
-        复检仍失败 → 降级交付原稿 + 审计副本——不悬挂用户端，拦截全程可见可审计。
+        复检仍失败（含自修调用异常/自修轮违规返回工具调用）→ 降级交付原稿 +
+        审计副本——不悬挂用户端，拦截全程可见可审计。
+        被拒原稿不回填 messages（剥离文体模仿源，见极简 retry prompt 实录），是有意设计。
         """
         answer = response.text
         if self._guardrails is None:
@@ -188,9 +199,39 @@ class ReActRuntime:
             retry_lines.append(f"必须包含以下小节标题：{'、'.join(sections)}")
         retry_lines.append("请直接重新输出完整最终回答，不要调用工具。")
         messages.append(Message("user", [TextBlock("\n".join(retry_lines))]))
-        retry_resp = self._client.chat(
-            messages, system=self._system, tools=self._registry.to_defs()
-        )
+        try:
+            retry_resp = self._client.chat(
+                messages, system=self._system, tools=self._registry.to_defs()
+            )
+        except Exception as exc:  # noqa: BLE001 — 自修轮网关异常降级交付，不悬挂用户端
+            degraded_reason = f"自修调用失败：{exc}"
+            self._emit(
+                effective, guardrail_event("output", "degraded", degraded_reason, round_no + 1)
+            )
+            self._audit(
+                {
+                    "kind": "output_degraded",
+                    "round": round_no + 1,
+                    "reason": degraded_reason,
+                    "answer": answer,
+                }
+            )
+            self._emit(effective, {"type": "final", "answer": answer})
+            local_trace.append(self._record(round_no, response, []))
+            return answer
+
+        if behavior:  # repair 已是最后一跳，超限只记账不终止（返回值忽略）
+            behavior.record_usage(retry_resp.usage)
+        if retry_resp.tool_uses:  # 自修轮违规返回工具调用：丢弃并留痕，只取文本复检
+            dropped = f"自修轮返回了 {len(retry_resp.tool_uses)} 个工具调用，已忽略"
+            self._emit(effective, guardrail_event("output", "blocked", dropped, round_no + 1))
+            self._audit(
+                {
+                    "kind": "repair_tool_use_dropped",
+                    "round": round_no + 1,
+                    "count": len(retry_resp.tool_uses),
+                }
+            )
         self._emit(effective, {"type": "round_start", "round": round_no + 1})
         repaired = retry_resp.text
 
