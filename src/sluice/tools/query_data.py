@@ -36,6 +36,18 @@ class QueryDataTool(Tool):
 
     def __init__(self, db_path: str):
         self._db_path = db_path
+        self._tables: list[str] | None = None
+
+    def table_allowlist(self) -> list[str]:
+        """供输入门禁做幻觉表校验：sqlite_master 在册表名，惰性查询并缓存。"""
+        if self._tables is None:
+            conn = sqlite3.connect(f"file:{self._db_path}?mode=ro", uri=True)
+            try:
+                rows = conn.execute("select name from sqlite_master where type='table'").fetchall()
+            finally:
+                conn.close()
+            self._tables = [r[0] for r in rows]
+        return self._tables
 
     def execute(self, args: dict[str, Any]) -> ToolResult:
         sql = (args.get("sql") or "").strip()
