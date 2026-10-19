@@ -15,27 +15,39 @@ def call_key(tu: ToolUseBlock) -> str:
 class BehaviorGate:
     """run 级状态（每次 run 新建实例）——跨 run 不共享记忆。
 
-    重复判定：与**上一轮**完全相同的调用（工具名+参数一致）→ 打断。
-    A→B→A 隔轮重复不算，留给 P3 evals 观察是否需要收紧。
+    重复判定两档：
+    - 同轮内（同一条 assistant 消息）完全相同调用 → 打断（P3 补，堵同轮双发漏拦）
+    - 与上一轮完全相同调用 → 打断；A→B→A 隔轮重复不算，留给 P3 evals 观察是否收紧
+    check_call 放行即登记当轮指纹（claim-on-pass）：被拦调用不算已执行，
+    同轮重试仍由输入门禁/重复判定接住，不会因 claim 缺失而漏拦。
     """
 
     def __init__(self, token_budget: int):
         self._budget = token_budget
         self._tokens_used = 0
         self._prev_keys: set[str] = set()
+        self._round_keys: set[str] = set()
 
     def check_call(self, tu: ToolUseBlock) -> str | None:
-        """工具执行前调用。返回 None 放行，返回打断原因（回喂模型）。"""
-        if call_key(tu) in self._prev_keys:
+        """工具执行前调用。返回 None 放行（并登记当轮指纹），返回打断原因（回喂模型）。"""
+        key = call_key(tu)
+        if key in self._round_keys:
+            return (
+                f"检测到同一轮内完全相同的重复调用 {tu.name}，已强制打断："
+                "一次工具调用即可，请不要在同一条消息里重复发起"
+            )
+        if key in self._prev_keys:
             return (
                 f"检测到与上一轮完全相同的重复调用 {tu.name}，已强制打断："
                 "请换一种方法推进，或直接给出最终回答"
             )
+        self._round_keys.add(key)
         return None
 
     def commit_round(self, tool_uses: list[ToolUseBlock]) -> None:
-        """每轮工具执行完后登记本轮调用指纹，作为下一轮的比对基准。"""
+        """每轮末轮转比对基准：本轮全部指纹（含被拦的）成为下一轮基准，当轮登记清空。"""
         self._prev_keys = {call_key(tu) for tu in tool_uses}
+        self._round_keys = set()
 
     def record_usage(self, usage: dict) -> str | None:
         """每轮末累计 token；超预算返回终止原因（loop 据此抛 BudgetExceededError）。"""

@@ -260,3 +260,31 @@ def test_resolve_audit_dir_anchors_default(tmp_path, monkeypatch):
     monkeypatch.delenv("SLUICE_AUDIT_DIR", raising=False)
     s = resolve_audit_dir(Settings())
     assert Path(s.audit_dir).is_absolute() and s.audit_dir.endswith("audit")
+
+
+def test_same_round_duplicate_tool_use_intercepted(tmp_path):
+    """运行时级：单条 assistant 消息双发同参调用 → 第二个被行为门禁打断。"""
+    registry = ToolRegistry()
+    registry.register(ReportTool())
+    settings = Settings(audit_dir=str(tmp_path / "a9"))
+    chain = GuardrailChain(settings)
+    client = ScriptedClient(
+        [
+            LLMResponse(
+                content=[
+                    ToolUseBlock("t1", "demo.report", {"text": "x"}),
+                    ToolUseBlock("t2", "demo.report", {"text": "x"}),
+                ],
+                stop_reason="tool_use",
+                usage={},
+            ),
+            _final("完成"),
+        ]
+    )
+    rt = ReActRuntime(client, registry, max_rounds=5, guardrails=chain)
+    events = []
+    rt.run("go", on_event=events.append)
+    g = [e for e in events if e["type"] == "guardrail"]
+    assert len(g) == 1 and g[0]["gate"] == "behavior" and "同一轮内" in g[0]["reason"]
+    audit_lines = (tmp_path / "a9" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line)["kind"] for line in audit_lines] == ["behavior_blocked"]
