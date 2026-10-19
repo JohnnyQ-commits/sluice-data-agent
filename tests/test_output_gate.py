@@ -1,4 +1,5 @@
 """tests/test_output_gate.py"""
+
 from sluice.guardrails.output_gate import check_output
 
 

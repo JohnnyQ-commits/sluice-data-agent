@@ -1,4 +1,5 @@
 """tests/test_behavior_gate.py"""
+
 import pytest
 
 from sluice.exceptions import BudgetExceededError
