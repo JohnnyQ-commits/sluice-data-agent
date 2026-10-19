@@ -14,6 +14,7 @@ from ..config.settings import Settings, resolve_audit_dir
 from ..guardrails.chain import GuardrailChain
 from ..llm.client import LLMClient
 from ..runtime.loop import ReActRuntime
+from ..runtime.prompt import build_system
 from ..skills.loader import SkillLoader
 from ..tools.query_data import QueryDataTool
 from ..tools.registry import ToolRegistry
@@ -40,7 +41,7 @@ def create_app(client=None, registry=None, runtime=None, skills_dir="skills") ->
     runtime = runtime or ReActRuntime(
         client,
         registry,
-        system=_build_system(packages),
+        system=build_system(packages),
         max_rounds=settings.react_max_rounds,
         guardrails=guardrails,
     )
@@ -112,11 +113,3 @@ def create_app(client=None, registry=None, runtime=None, skills_dir="skills") ->
         return send_from_directory(_FRONTEND_DIST / "assets", filename)
 
     return app
-
-
-def _build_system(packages) -> str:
-    base = "你是 Sluice 平台的助手。可以调用提供的工具完成任务，完成后直接给出最终回答。"
-    if packages:
-        lines = "\n".join(p.prompt_line() for p in packages)
-        base += "\n\n可用的 Skill（通过其带前缀的工具使用）：\n" + lines
-    return base
