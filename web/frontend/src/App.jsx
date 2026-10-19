@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function EventLine({ ev }) {
   if (ev.type === "round_start") {
@@ -43,6 +43,25 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const bottomRef = useRef(null);
 
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // 纯 updater：最后一条 run 消息追加本地合成 error 事件（无则新建 run 消息）
+  function appendLocalError(message) {
+    setMessages((m) => {
+      const last = m[m.length - 1];
+      if (last && last.role === "run") {
+        return m.map((msg, i) =>
+          i === m.length - 1
+            ? { ...msg, events: [...msg.events, { type: "error", message }] }
+            : msg
+        );
+      }
+      return [...m, { role: "run", events: [{ type: "error", message }] }];
+    });
+  }
+
   async function send() {
     const text = input.trim();
     if (!text || busy) return;
@@ -50,41 +69,55 @@ export default function App() {
     setBusy(true);
     setMessages((m) => [...m, { role: "user", text }]);
 
-    const runId = (
-      await (
-        await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text }),
-        })
-      ).json()
-    ).run_id;
+    let es;
+    try {
+      const runId = (
+        await (
+          await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text }),
+          })
+        ).json()
+      ).run_id;
 
-    setMessages((m) => [...m, { role: "run", events: [] }]);
-    const es = new EventSource(`/api/stream/${runId}`);
+      setMessages((m) => [...m, { role: "run", events: [] }]);
+      es = new EventSource(`/api/stream/${runId}`);
+    } catch (err) {
+      appendLocalError("发送失败:" + err.message);
+      setBusy(false);
+      return;
+    }
+
     es.onmessage = (e) => {
-      const ev = JSON.parse(e.data);
+      let ev;
+      try {
+        ev = JSON.parse(e.data);
+      } catch {
+        es.close();
+        appendLocalError("收到非 JSON 事件");
+        setBusy(false);
+        return;
+      }
       if (ev.type === "final") {
         es.close();
-        setMessages((m) => {
-          const copy = [...m];
-          const last = copy[copy.length - 1];
-          if (last && last.role === "run") last.answer = ev.answer;
-          return copy;
-        });
+        setMessages((m) =>
+          m.map((msg, i) =>
+            i === m.length - 1 && msg.role === "run" ? { ...msg, answer: ev.answer } : msg
+          )
+        );
         setBusy(false);
       } else {
-        setMessages((m) => {
-          const copy = [...m];
-          const last = copy[copy.length - 1];
-          if (last && last.role === "run") last.events = [...last.events, ev];
-          return copy;
-        });
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        setMessages((m) =>
+          m.map((msg, i) =>
+            i === m.length - 1 && msg.role === "run" ? { ...msg, events: [...msg.events, ev] } : msg
+          )
+        );
       }
     };
     es.onerror = () => {
       es.close();
+      appendLocalError("连接中断");
       setBusy(false);
     };
   }
@@ -119,7 +152,7 @@ export default function App() {
           value={input}
           placeholder={busy ? "Agent 运行中…" : "例如：生成上周的数据周报"}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
+          onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && send()}
           disabled={busy}
         />
         <button
