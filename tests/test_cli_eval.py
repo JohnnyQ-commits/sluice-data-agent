@@ -89,3 +89,68 @@ def test_run_eval_non_dict_case_is_error_not_crash(tmp_path):
         judge_client=None,
     )
     assert results[0].status == "error"
+
+
+# --- CLI exit 语义（_eval 门禁/选包/基线落盘） ---
+
+import pytest
+
+from sluice.cli import main as cli_main
+from sluice.evals.model import CaseResult, EvalReport
+
+
+def _stub_pkg(fail=False):
+    evals = [
+        {
+            "name": "g1",
+            "layer": "guardrail",
+            "input": "x",
+            "script": [{"text": "done"}],
+            # fail=True：期望门禁事件但剧本不触发 → missing → fail
+            "expect_guardrails": [{"gate": "input", "action": "blocked"}] if fail else [],
+        }
+    ]
+    return SkillPackage(name="alpha", description="d", path=Path("."), evals=evals)
+
+
+def _patch_cli(monkeypatch, tmp_path, pkgs):
+    """repo 根指到 tmp、强制无 key、audit 指 tmp、Skill 加载返回桩包。"""
+    monkeypatch.setattr(cli_main, "_REPO_ROOT", tmp_path)
+    monkeypatch.setenv("SLUICE_LLM_API_KEY", "")
+    monkeypatch.setenv("SLUICE_AUDIT_DIR", str(tmp_path / "audit"))
+    monkeypatch.setattr(cli_main.SkillLoader, "load", lambda self, d, registry: pkgs)
+
+
+def test_eval_gate_fail_exits_1(tmp_path, monkeypatch):
+    _patch_cli(monkeypatch, tmp_path, [_stub_pkg(fail=True)])
+    baseline = EvalReport(results=[CaseResult("alpha", "g1", "guardrail", "pass")])
+    bp = tmp_path / "baseline.json"
+    baseline.save(bp)
+    with pytest.raises(SystemExit) as ei:
+        cli_main.main(["eval", "--all", "--baseline", str(bp)])
+    assert ei.value.code == 1
+
+
+def test_eval_gate_pass_exits_0(tmp_path, monkeypatch):
+    _patch_cli(monkeypatch, tmp_path, [_stub_pkg()])
+    baseline = EvalReport(results=[CaseResult("alpha", "g1", "guardrail", "pass")])
+    bp = tmp_path / "baseline.json"
+    baseline.save(bp)
+    with pytest.raises(SystemExit) as ei:
+        cli_main.main(["eval", "--all", "--baseline", str(bp)])
+    assert ei.value.code == 0
+
+
+def test_eval_unknown_skill_exits_2(tmp_path, monkeypatch):
+    _patch_cli(monkeypatch, tmp_path, [_stub_pkg()])
+    with pytest.raises(SystemExit) as ei:
+        cli_main.main(["eval", "ghost"])
+    assert ei.value.code == 2
+
+
+def test_eval_update_baseline_writes_file(tmp_path, monkeypatch):
+    _patch_cli(monkeypatch, tmp_path, [_stub_pkg()])
+    with pytest.raises(SystemExit) as ei:
+        cli_main.main(["eval", "--all", "--update-baseline"])
+    assert ei.value.code == 0
+    assert (tmp_path / "evals" / "baseline.json").is_file()

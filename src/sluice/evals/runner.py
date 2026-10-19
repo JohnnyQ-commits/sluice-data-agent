@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from ..skills.loader import SkillPackage
 
 EVAL_MAX_ROUNDS = 8  # 门禁用例走完 拦截→自纠→final 足够，轮次上限防剧本行为失控
+_NO_KEY_REASON = "需要 SLUICE_LLM_API_KEY"  # behavior/outcome 无 client 时的 skipped 原因
 
 
 class ScriptExhaustedError(SluiceError):
@@ -283,7 +284,7 @@ def run_eval(
                             case.name,
                             case.layer,
                             "skipped",
-                            {"reason": "需要 SLUICE_LLM_API_KEY"},
+                            {"reason": _NO_KEY_REASON},
                         )
                     )
                 else:
@@ -296,7 +297,7 @@ def run_eval(
                             case.name,
                             case.layer,
                             "skipped",
-                            {"reason": "需要 SLUICE_LLM_API_KEY"},
+                            {"reason": _NO_KEY_REASON},
                         )
                     )
                 else:

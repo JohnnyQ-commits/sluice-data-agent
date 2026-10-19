@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-import time
+from datetime import datetime
 from pathlib import Path
 
 from ..config.settings import Settings, resolve_audit_dir
@@ -20,6 +20,10 @@ from ..skills.loader import SkillLoader
 from ..tools.echo import EchoTool
 from ..tools.query_data import QueryDataTool
 from ..tools.registry import ToolRegistry
+
+# repo 根锚定（main.py 在 src/sluice/cli/ 下，parents[3] = repo 根）：
+# skills 目录、evals 报告/基线统一由此出发，防 IDE/其他 cwd 启动时路径漂移
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -74,10 +78,9 @@ def _list_skills(skills_dir: str | Path = "skills") -> list[str]:
 def _eval(args: argparse.Namespace) -> None:
     settings = Settings()
     settings = resolve_audit_dir(settings)
-    repo_root = Path(__file__).resolve().parents[3]
     registry = ToolRegistry()
     registry.register(QueryDataTool(settings.demo_db_path))
-    packages = SkillLoader().load(repo_root / "skills", registry)
+    packages = SkillLoader().load(_REPO_ROOT / "skills", registry)
 
     if args.all:
         selected = packages
@@ -104,7 +107,8 @@ def _eval(args: argparse.Namespace) -> None:
 
     results = run_eval(selected, packages, registry, settings, client, judge_client)
     report = EvalReport(results=results)
-    out = repo_root / "evals" / "reports" / f"{time.strftime('%Y%m%d-%H%M%S')}.json"
+    # 微秒精度：同秒内连续两次 eval 不互相覆写报告（time.strftime 在 Windows 不支持 %f）
+    out = _REPO_ROOT / "evals" / "reports" / f"{datetime.now().strftime('%Y%m%d-%H%M%S%f')}.json"
     report.save(out)
     _print_report(report, out)
 
@@ -116,7 +120,7 @@ def _eval(args: argparse.Namespace) -> None:
         for line in lines or ["（无可比条目）"]:
             print(line)
     if args.update_baseline:
-        baseline_path = repo_root / "evals" / "baseline.json"
+        baseline_path = _REPO_ROOT / "evals" / "baseline.json"
         report.save(baseline_path)
         print(f"基线已更新: {baseline_path}")
     sys.exit(0 if gate_ok else 1)
@@ -141,9 +145,9 @@ def _web(args: argparse.Namespace) -> None:
 
     from ..web.app import create_app  # 延迟导入：run 子命令无需 Flask
 
-    # skills 目录锚定 repo 根（main.py 在 src/sluice/cli/ 下，parents[3] = repo 根），
-    # 防 IDE/其他 cwd 启动时静默丢 Skill；目录缺失时 SkillLoader 返回空清单自然降级
-    skills_dir = Path(__file__).resolve().parents[3] / "skills"
+    # skills 目录锚定 repo 根，防 IDE/其他 cwd 启动时静默丢 Skill；
+    # 目录缺失时 SkillLoader 返回空清单自然降级
+    skills_dir = _REPO_ROOT / "skills"
     app = create_app(skills_dir=str(skills_dir))
 
     packages = app.config.get("SLUICE_SKILLS", [])

@@ -63,3 +63,16 @@ def test_new_skill_added_is_neutral():
     )
     ok, _ = compare(new, base)
     assert ok  # 新增 skill 的失败不追溯旧基线
+
+
+def test_vanished_skill_fails():
+    """基线有结果的 skill 在新报告中整体消失（如加载失败）→ 门禁 fail。"""
+    base = _report(
+        [
+            CaseResult("s", "a", "guardrail", "pass"),
+            CaseResult("t", "b", "guardrail", "pass"),
+        ]
+    )
+    new = _report([CaseResult("s", "a", "guardrail", "pass")])
+    ok, lines = compare(new, base)
+    assert not ok and any("消失" in line for line in lines)

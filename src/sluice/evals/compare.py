@@ -20,9 +20,14 @@ def compare(new: EvalReport, baseline: EvalReport) -> tuple[bool, list[str]]:
     """返回 (门禁是否通过, 人类可读比对行)。"""
     lines: list[str] = []
     ok = True
-    common = {r.skill for r in baseline.results if r.status != "skipped"} & {
-        r.skill for r in new.results if r.status != "skipped"
-    }
+    base_skills = {r.skill for r in baseline.results if r.status != "skipped"}
+    new_skills = {r.skill for r in new.results if r.status != "skipped"}
+    # 消失的 skill：基线有非 skipped 结果、新报告中零条结果（含 skipped）——
+    # 多为 skill 包加载失败被静默跳过，不能因"取交集"而绿灯放过整个 skill 失测
+    for skill in sorted(base_skills - {r.skill for r in new.results}):
+        ok = False
+        lines.append(f"❌ {skill}: 从新报告消失（加载失败？）")
+    common = base_skills & new_skills
     for skill in sorted(common):
         bp, np_ = _skill_pass_rate(baseline, skill), _skill_pass_rate(new, skill)
         mark = "✅" if np_ >= bp else "❌"
