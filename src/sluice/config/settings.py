@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,3 +26,16 @@ class Settings(BaseSettings):
 
     # Web / 数据
     demo_db_path: str = "data/demo.db"
+
+
+def resolve_audit_dir(settings: Settings) -> Settings:
+    """audit 目录锚定 repo 根（settings.py 在 src/sluice/config/ 下，parents[3] = repo 根）。
+
+    仅当 audit_dir 仍为默认值 "audit" 时才锚定，防 IDE/其他 cwd 启动时把 audit/ 写散；
+    用户通过 env/.env 显式配置的 SLUICE_AUDIT_DIR 不被覆盖。
+    """
+    if settings.audit_dir != "audit":
+        return settings
+    return settings.model_copy(
+        update={"audit_dir": str(Path(__file__).resolve().parents[3] / "audit")}
+    )

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
-from ..config.settings import Settings
+from ..config.settings import Settings, resolve_audit_dir
 from ..guardrails.chain import GuardrailChain
 from ..llm.client import LLMClient
 from ..runtime.loop import ReActRuntime
@@ -29,11 +29,7 @@ def _stream_idle_timeout(settings: Settings) -> float:
 def create_app(client=None, registry=None, runtime=None, skills_dir="skills") -> Flask:
     app = Flask(__name__, static_folder=None)
     settings = Settings()
-    # audit 目录锚定 repo 根（app.py 在 src/sluice/web/ 下，parents[3] = repo 根），
-    # 防 IDE/其他 cwd 启动时把 audit/ 写散到任意工作目录
-    settings = settings.model_copy(
-        update={"audit_dir": str(Path(__file__).resolve().parents[3] / "audit")}
-    )
+    settings = resolve_audit_dir(settings)
     client = client or LLMClient(settings)
     if registry is None:
         registry = ToolRegistry()

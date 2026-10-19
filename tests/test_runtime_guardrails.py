@@ -221,3 +221,22 @@ def test_repair_round_tool_use_dropped_then_degraded(tmp_path):
     audit_lines = (tmp_path / "a7" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
     kinds = [json.loads(line)["kind"] for line in audit_lines]
     assert kinds == ["output_rejected", "repair_tool_use_dropped", "output_degraded"]
+
+
+def test_resolve_audit_dir_keeps_explicit(tmp_path, monkeypatch):
+    """显式 SLUICE_AUDIT_DIR 配置不被 repo 根锚定覆盖（守卫只对默认值生效）。"""
+    from sluice.config.settings import resolve_audit_dir
+
+    custom = tmp_path / "custom_audit"
+    monkeypatch.setenv("SLUICE_AUDIT_DIR", str(custom))
+    s = resolve_audit_dir(Settings())
+    assert s.audit_dir == str(custom)
+
+
+def test_resolve_audit_dir_anchors_default(tmp_path, monkeypatch):
+    """audit_dir 仍为默认值时锚定 repo 根，防 cwd 漂移写散审计目录。"""
+    from sluice.config.settings import resolve_audit_dir
+
+    monkeypatch.delenv("SLUICE_AUDIT_DIR", raising=False)
+    s = resolve_audit_dir(Settings())
+    assert s.audit_dir.endswith("audit")
