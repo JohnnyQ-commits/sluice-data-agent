@@ -17,5 +17,10 @@ class Settings(BaseSettings):
     # ReAct 循环
     react_max_rounds: int = 10
 
+    # Guardrails（P2）
+    guardrails_enabled: bool = True
+    react_token_budget: int = 200_000
+    audit_dir: str = "audit"
+
     # Web / 数据
     demo_db_path: str = "data/demo.db"

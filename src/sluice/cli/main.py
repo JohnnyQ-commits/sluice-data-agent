@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ..config.settings import Settings
 from ..exceptions import SluiceError
+from ..guardrails.chain import GuardrailChain
 from ..llm.client import LLMClient
 from ..runtime.loop import ReActRuntime
 from ..skills.loader import SkillLoader
@@ -82,7 +83,13 @@ def _run(message: str) -> None:
 
     registry = ToolRegistry()
     registry.register(EchoTool())
-    runtime = ReActRuntime(LLMClient(settings), registry, max_rounds=settings.react_max_rounds)
+    guardrails = GuardrailChain(settings) if settings.guardrails_enabled else None
+    runtime = ReActRuntime(
+        LLMClient(settings),
+        registry,
+        max_rounds=settings.react_max_rounds,
+        guardrails=guardrails,
+    )
 
     print(f"指令: {message}\n---")
     try:

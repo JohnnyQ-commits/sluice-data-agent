@@ -11,6 +11,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request, send_from_directory
 
 from ..config.settings import Settings
+from ..guardrails.chain import GuardrailChain
 from ..llm.client import LLMClient
 from ..runtime.loop import ReActRuntime
 from ..skills.loader import SkillLoader
@@ -34,11 +35,13 @@ def create_app(client=None, registry=None, runtime=None, skills_dir="skills") ->
         registry.register(QueryDataTool(settings.demo_db_path))
     packages = SkillLoader().load(skills_dir, registry) if skills_dir else []
     app.config["SLUICE_SKILLS"] = packages  # CLI 横幅等外部取清单用，避免二次 load
+    guardrails = GuardrailChain(settings, packages) if settings.guardrails_enabled else None
     runtime = runtime or ReActRuntime(
         client,
         registry,
         system=_build_system(packages),
         max_rounds=settings.react_max_rounds,
+        guardrails=guardrails,
     )
 
     runs: dict[str, queue.Queue] = {}
