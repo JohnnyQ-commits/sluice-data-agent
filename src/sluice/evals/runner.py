@@ -233,3 +233,72 @@ class OutcomeRunner:
             "pass" if not missing else "fail",
             detail,
         )
+
+
+def run_eval(
+    selected: list[SkillPackage],
+    packages: list[SkillPackage],
+    registry: ToolRegistry,
+    settings: Settings,
+    client: LLMClient | None = None,
+    judge_client: LLMClient | None = None,
+) -> list[CaseResult]:
+    """三层用例分发执行。client/judge_client 为 None 时对应层 skipped（无 API key 场景）。
+
+    selected: 参评 SkillPackage 列表；packages: 全量包列表（behavior 层 system 提示要列全部 skill）。
+    """
+    guardrail_runner = GuardrailRunner(settings)
+    behavior_runner = BehaviorRunner(client) if client is not None else None
+    outcome_runner = OutcomeRunner(settings, client, judge_client) if client is not None else None
+    results: list[CaseResult] = []
+    for pkg in selected:
+        for raw in pkg.evals:
+            if not isinstance(raw, dict):
+                results.append(
+                    CaseResult(
+                        pkg.name,
+                        "?",
+                        "invalid",
+                        "error",
+                        {"error": f"评测用例应为 dict，收到 {type(raw).__name__}: {raw!r}"},
+                    )
+                )
+                continue
+            try:
+                case = EvalCase.from_dict(pkg.name, raw)
+            except ValueError as exc:
+                results.append(
+                    CaseResult(
+                        pkg.name, str(raw.get("name", "?")), "invalid", "error", {"error": str(exc)}
+                    )
+                )
+                continue
+            if case.layer == "guardrail":
+                results.append(guardrail_runner.run_case(case, registry))
+            elif case.layer == "behavior":
+                if behavior_runner is None:
+                    results.append(
+                        CaseResult(
+                            pkg.name,
+                            case.name,
+                            case.layer,
+                            "skipped",
+                            {"reason": "需要 SLUICE_LLM_API_KEY"},
+                        )
+                    )
+                else:
+                    results.append(behavior_runner.run_case(case, packages, registry))
+            else:
+                if outcome_runner is None:
+                    results.append(
+                        CaseResult(
+                            pkg.name,
+                            case.name,
+                            case.layer,
+                            "skipped",
+                            {"reason": "需要 SLUICE_LLM_API_KEY"},
+                        )
+                    )
+                else:
+                    results.append(outcome_runner.run_case(case, pkg, registry))
+    return results

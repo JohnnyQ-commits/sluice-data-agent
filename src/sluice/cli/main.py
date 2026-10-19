@@ -5,15 +5,20 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
 from pathlib import Path
 
 from ..config.settings import Settings, resolve_audit_dir
+from ..evals.compare import compare
+from ..evals.model import EvalReport
+from ..evals.runner import run_eval
 from ..exceptions import SluiceError
 from ..guardrails.chain import GuardrailChain
 from ..llm.client import LLMClient
 from ..runtime.loop import ReActRuntime
 from ..skills.loader import SkillLoader
 from ..tools.echo import EchoTool
+from ..tools.query_data import QueryDataTool
 from ..tools.registry import ToolRegistry
 
 
@@ -27,6 +32,18 @@ def build_parser() -> argparse.ArgumentParser:
     web_p = sub.add_parser("web", help="启动 Web 界面（Flask + SSE）")
     web_p.add_argument("--host", default="127.0.0.1", help="监听地址（默认 127.0.0.1）")
     web_p.add_argument("--port", type=int, default=5001, help="监听端口（默认 5001）")
+    eval_p = sub.add_parser("eval", help="Skill 评测（三层：产出/行为/门禁）+ 基线回归门禁")
+    eval_p.add_argument("skill", nargs="?", default=None, help="Skill 名；与 --all 二选一")
+    eval_p.add_argument("--all", action="store_true", help="评测全部 Skill")
+    eval_p.add_argument(
+        "--baseline", metavar="JSON", help="基线报告路径：比对并门禁（分数下降 exit 1）"
+    )
+    eval_p.add_argument(
+        "--update-baseline", action="store_true", help="本次报告写为基线 evals/baseline.json"
+    )
+    eval_p.add_argument(
+        "--skip-judge", action="store_true", help="跳过 LLM-as-judge（只跑确定性断言）"
+    )
     return parser
 
 
@@ -36,6 +53,8 @@ def main(argv: list[str] | None = None) -> None:
         _run(args.message)
     elif args.command == "web":
         _web(args)
+    elif args.command == "eval":
+        _eval(args)
 
 
 def _list_skills(skills_dir: str | Path = "skills") -> list[str]:
@@ -50,6 +69,68 @@ def _list_skills(skills_dir: str | Path = "skills") -> list[str]:
     except Exception as exc:  # noqa: BLE001 — 目录缺失/损坏时降级，不阻断诊断
         logging.getLogger(__name__).warning("Skill 探测失败: %s", exc)
         return []
+
+
+def _eval(args: argparse.Namespace) -> None:
+    settings = Settings()
+    settings = resolve_audit_dir(settings)
+    repo_root = Path(__file__).resolve().parents[3]
+    registry = ToolRegistry()
+    registry.register(QueryDataTool(settings.demo_db_path))
+    packages = SkillLoader().load(repo_root / "skills", registry)
+
+    if args.all:
+        selected = packages
+    elif args.skill:
+        selected = [p for p in packages if p.name == args.skill]
+        if not selected:
+            names = ", ".join(p.name for p in packages) or "（无）"
+            print(f"未找到 Skill: {args.skill}（可用: {names}）", file=sys.stderr)
+            sys.exit(2)
+    else:
+        print("指定 Skill 名或 --all", file=sys.stderr)
+        sys.exit(2)
+
+    has_key = bool(settings.llm_api_key)
+    client = LLMClient(settings) if has_key else None
+    judge_client = None
+    if has_key and not args.skip_judge:
+        judge_settings = (
+            settings.model_copy(update={"llm_model": settings.eval_judge_model})
+            if settings.eval_judge_model
+            else settings
+        )
+        judge_client = LLMClient(judge_settings)
+
+    results = run_eval(selected, packages, registry, settings, client, judge_client)
+    report = EvalReport(results=results)
+    out = repo_root / "evals" / "reports" / f"{time.strftime('%Y%m%d-%H%M%S')}.json"
+    report.save(out)
+    _print_report(report, out)
+
+    gate_ok = True
+    if args.baseline:
+        baseline = EvalReport.load(args.baseline)
+        gate_ok, lines = compare(report, baseline)
+        print("--- 基线比对 ---")
+        for line in lines or ["（无可比条目）"]:
+            print(line)
+    if args.update_baseline:
+        baseline_path = repo_root / "evals" / "baseline.json"
+        report.save(baseline_path)
+        print(f"基线已更新: {baseline_path}")
+    sys.exit(0 if gate_ok else 1)
+
+
+def _print_report(report: EvalReport, out: Path) -> None:
+    flag = {"pass": "✅", "fail": "❌", "error": "💥", "skipped": "⏭"}
+    avg = report.judge_avg()
+    print(f"通过率 {report.pass_rate():.0%}  judge 均分 {f'{avg:.2f}' if avg is not None else '-'}")
+    for r in report.results:
+        print(f"  {flag[r.status]} [{r.skill}] {r.case} ({r.layer}) {r.status}")
+        if r.status in ("fail", "error") and r.detail:
+            print(f"      {r.detail}")
+    print(f"报告: {out}")
 
 
 def _web(args: argparse.Namespace) -> None:
