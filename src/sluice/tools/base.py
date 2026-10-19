@@ -21,6 +21,7 @@ class Tool(ABC):
     name: str
     description: str
     parameters: dict[str, Any]  # JSON Schema
+    owner_skill: str | None = None  # Skill 私有工具由 loader 打标，内置/MCP 工具为 None
 
     @abstractmethod
     def execute(self, args: dict[str, Any]) -> ToolResult: ...

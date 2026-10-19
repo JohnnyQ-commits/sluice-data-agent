@@ -1,6 +1,7 @@
 ---
 name: weekly-report
 description: 数据周报生成。当用户要求生成周报、数据周报、weekly report、本周经营汇总时使用。流程：用 query_data 查询本周与上周的聚合数据，计算环比，再用 weekly-report.render_report 渲染成周报。
+output_contract: 核心指标;重点发现
 ---
 
 # 数据周报 Skill

@@ -146,3 +146,40 @@ def test_parse_skill_md_strips_paired_quotes():
     meta = parse_skill_md('---\nname: "weekly-report"\ndescription: \'数据周报\'\n---\n')
     assert meta["name"] == "weekly-report"
     assert meta["description"] == "数据周报"
+
+
+def test_output_contract_parsed_from_frontmatter(tmp_path):
+    skill = tmp_path / "s1"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text(
+        "---\nname: s1\ndescription: d\noutput_contract: 核心指标;重点发现\n---\n正文",
+        encoding="utf-8",
+    )
+    pkg = SkillLoader().load(tmp_path)[0]
+    assert pkg.output_contract == ["核心指标", "重点发现"]
+
+
+def test_output_contract_defaults_empty(tmp_path):
+    skill = tmp_path / "s2"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("---\nname: s2\ndescription: d\n---\n正文", encoding="utf-8")
+    assert SkillLoader().load(tmp_path)[0].output_contract == []
+
+
+def test_tools_tagged_with_owner_skill(tmp_path):
+    skill = tmp_path / "s3"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("---\nname: s3\ndescription: d\n---\n正文", encoding="utf-8")
+    (skill / "tools.py").write_text(
+        "from sluice.tools.base import Tool, ToolResult\n"
+        "class T(Tool):\n"
+        "    name = 't'\n"
+        "    description = 'x'\n"
+        "    parameters = {}\n"
+        "    def execute(self, args):\n"
+        "        return ToolResult('ok')\n"
+        "TOOLS = [T()]\n",
+        encoding="utf-8",
+    )
+    pkg = SkillLoader().load(tmp_path)[0]
+    assert pkg.tools[0].owner_skill == "s3"

@@ -49,6 +49,7 @@ class SkillPackage:
     description: str
     path: Path
     tools: list[Tool] = field(default_factory=list)
+    output_contract: list[str] = field(default_factory=list)
 
     def prompt_line(self) -> str:
         return f"- {self.name}: {self.description}"
@@ -95,6 +96,7 @@ class SkillLoader:
                 continue
             for t in tools:
                 t.name = f"{meta['name']}.{t.name}"
+                t.owner_skill = meta["name"]
                 if registry is not None:
                     registry.register(t)
             packages.append(
@@ -103,6 +105,11 @@ class SkillLoader:
                     description=meta.get("description", ""),
                     path=d,
                     tools=tools,
+                    output_contract=[
+                        s.strip()
+                        for s in meta.get("output_contract", "").split(";")
+                        if s.strip()
+                    ],
                 )
             )
         return packages
