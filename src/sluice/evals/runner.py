@@ -225,6 +225,7 @@ class OutcomeRunner:
                 missing = missing or [
                     f"judge 均分 {avg:.2f} < {self._settings.eval_judge_threshold}"
                 ]
+                detail["missing"] = missing  # detail 已持旧列表引用，重赋后须同步回填
         return CaseResult(
             case.skill,
             case.name,

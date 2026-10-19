@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     audit_dir: str = "audit"
 
     # Evals（P3）
-    eval_judge_threshold: float = 3.5  # LLM-as-judge 均分门限，T7 接线
+    eval_judge_threshold: float = 4.0  # judge 有效项均分低于此值 → 用例 fail
+    eval_judge_model: str = ""  # 空 = 复用 llm_model；judge 与被评模型可分离
 
     # Web / 数据
     demo_db_path: str = "data/demo.db"

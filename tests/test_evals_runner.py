@@ -271,6 +271,50 @@ def test_outcome_runner_rounds_exhausted_is_fail(tmp_path):
     assert result.status == "fail" and "ReAct 循环超过" in result.detail["error"]
 
 
+def test_outcome_runner_judge_branch_wiring(tmp_path):
+    """judge_rubric + judge_client 同时在场 → judge 分支触达，detail 进 judge 字段。
+
+    judge 桩给有效分 2 分（引用真实产出子串），低于阈值 4.0 → fail 且 missing 带 judge 均分字样。
+    """
+
+    class Scripted:
+        def __init__(self, responses):
+            self._responses = list(responses)
+
+        def chat(self, messages, system=None, tools=None):
+            return self._responses.pop(0)
+
+    client = Scripted(
+        [
+            LLMResponse(
+                content=[ToolUseBlock("t1", "alpha.query", {"sql": "SELECT 1"})],
+                stop_reason="tool_use",
+                usage={},
+            ),
+            LLMResponse(content=[TextBlock("## 指标\n5")], stop_reason="end_turn", usage={}),
+        ]
+    )
+
+    class StubJudge:
+        def chat(self, messages, system=None, tools=None):
+            return LLMResponse(
+                content=[
+                    TextBlock('{"items": [{"item": "口径清晰", "score": 2, "quote": "## 指标"}]}')
+                ],
+                stop_reason="end_turn",
+                usage={},
+            )
+
+    case = _case(layer="outcome", input="出报表", must_contain=["指标"], judge_rubric=["口径清晰"])
+    result = OutcomeRunner(Settings(audit_dir=str(tmp_path / "a")), client, StubJudge()).run_case(
+        case, _package(), _registry()
+    )
+    assert result.detail["judge_valid"] is True
+    assert result.detail["judge_avg"] == 2.0
+    assert result.status == "fail"
+    assert any("judge 均分" in m for m in result.detail["missing"])
+
+
 def test_outcome_runner_gateway_error_is_error(tmp_path):
     """网关故障（LLMTimeoutError 等非轮次 SluiceError）→ error，不冒充产出质量 fail 污染 pass_rate。"""
 
