@@ -143,7 +143,7 @@ def test_loader_all_bad_returns_empty_with_warning(tmp_path, caplog):
 
 
 def test_parse_skill_md_strips_paired_quotes():
-    meta = parse_skill_md('---\nname: "weekly-report"\ndescription: \'数据周报\'\n---\n')
+    meta = parse_skill_md("---\nname: \"weekly-report\"\ndescription: '数据周报'\n---\n")
     assert meta["name"] == "weekly-report"
     assert meta["description"] == "数据周报"
 
@@ -183,3 +183,38 @@ def test_tools_tagged_with_owner_skill(tmp_path):
     )
     pkg = SkillLoader().load(tmp_path)[0]
     assert pkg.tools[0].owner_skill == "s3"
+
+
+def test_evals_cases_discovered(tmp_path):
+    """evals/cases.py 的模块级 CASES 被自动发现进 SkillPackage.evals。"""
+    root = tmp_path / "skills"
+    pkg = root / "alpha"
+    (pkg / "evals").mkdir(parents=True)
+    (pkg / "SKILL.md").write_text("---\nname: alpha\ndescription: d\n---\n# t\n", encoding="utf-8")
+    (pkg / "evals" / "cases.py").write_text(
+        "CASES = [{'name': 'c1', 'layer': 'guardrail', 'input': 'hi'}]", encoding="utf-8"
+    )
+    packages = SkillLoader().load(root, ToolRegistry())
+    assert packages[0].evals == [{"name": "c1", "layer": "guardrail", "input": "hi"}]
+
+
+def test_evals_missing_dir_is_empty_list(tmp_path):
+    root = tmp_path / "skills"
+    pkg = root / "alpha"
+    pkg.mkdir(parents=True)
+    (pkg / "SKILL.md").write_text("---\nname: alpha\ndescription: d\n---\n# t\n", encoding="utf-8")
+    packages = SkillLoader().load(root, ToolRegistry())
+    assert packages[0].evals == []
+
+
+def test_evals_broken_module_skips_package_not_crash(tmp_path):
+    """evals 模块语法错误 → 该包整体跳过（复用单包异常不殃及其他 skill 的约定）。"""
+    root = tmp_path / "skills"
+    bad, good = root / "bad", root / "good"
+    (bad / "evals").mkdir(parents=True)
+    good.mkdir(parents=True)
+    (bad / "SKILL.md").write_text("---\nname: bad\ndescription: d\n---\n# t\n", encoding="utf-8")
+    (bad / "evals" / "cases.py").write_text("CASES = [(", encoding="utf-8")
+    (good / "SKILL.md").write_text("---\nname: good\ndescription: d\n---\n# t\n", encoding="utf-8")
+    packages = SkillLoader().load(root, ToolRegistry())
+    assert [p.name for p in packages] == ["good"]

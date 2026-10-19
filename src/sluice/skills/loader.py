@@ -50,6 +50,7 @@ class SkillPackage:
     path: Path
     tools: list[Tool] = field(default_factory=list)
     output_contract: list[str] = field(default_factory=list)
+    evals: list[dict] = field(default_factory=list)
 
     def prompt_line(self) -> str:
         return f"- {self.name}: {self.description}"
@@ -58,15 +59,19 @@ class SkillPackage:
 _MODULE_SEQ = itertools.count()
 
 
-def _load_tools(py_path: Path, skill_name: str) -> list[Tool]:
-    # 模块名加唯一后缀，避免 sys.modules 同名条目被二次 exec 覆盖造成状态串扰
+def _exec_module(py_path: Path, skill_name: str, attr: str):
+    """按路径 exec 模块并取属性；模块名加唯一后缀，避免 sys.modules 同名条目被二次 exec 覆盖造成状态串扰。"""
     spec = importlib.util.spec_from_file_location(
-        f"sluice_skill_{skill_name}_tools_{next(_MODULE_SEQ)}", py_path
+        f"sluice_skill_{skill_name}_{attr}_{next(_MODULE_SEQ)}", py_path
     )
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
-    return list(getattr(module, "TOOLS", []))
+    return getattr(module, attr, None)
+
+
+def _load_tools(py_path: Path, skill_name: str) -> list[Tool]:
+    return list(_exec_module(py_path, skill_name, "TOOLS") or [])
 
 
 class SkillLoader:
@@ -87,8 +92,12 @@ class SkillLoader:
                 if not meta.get("name"):
                     continue
                 tools = (
-                    _load_tools(d / "tools.py", meta["name"])
-                    if (d / "tools.py").is_file()
+                    _load_tools(d / "tools.py", meta["name"]) if (d / "tools.py").is_file() else []
+                )
+                evals_path = d / "evals" / "cases.py"
+                evals = (
+                    list(_exec_module(evals_path, meta["name"], "CASES") or [])
+                    if evals_path.is_file()
                     else []
                 )
             except Exception as e:  # noqa: BLE001 - 单包异常不殃及其他 skill
@@ -105,10 +114,9 @@ class SkillLoader:
                     description=meta.get("description", ""),
                     path=d,
                     tools=tools,
+                    evals=evals,
                     output_contract=[
-                        s.strip()
-                        for s in meta.get("output_contract", "").split(";")
-                        if s.strip()
+                        s.strip() for s in meta.get("output_contract", "").split(";") if s.strip()
                     ],
                 )
             )
