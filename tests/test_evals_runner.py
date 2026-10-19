@@ -10,12 +10,14 @@ from sluice.evals.runner import (
     EVAL_MAX_ROUNDS,
     BehaviorRunner,
     GuardrailRunner,
+    OutcomeRunner,
     ScriptedClient,
     ScriptExhaustedError,
     _response_from_spec,
 )
 from sluice.guardrails.chain import GuardrailChain
 from sluice.llm.types import LLMResponse, TextBlock, ToolUseBlock
+from sluice.skills.loader import SkillPackage
 from sluice.tools.base import Tool, ToolResult
 from sluice.tools.registry import ToolRegistry
 
@@ -179,3 +181,88 @@ def test_behavior_runner_chat_exception_is_error():
     result = BehaviorRunner(ExplodesClient()).run_case(case, [], _registry())
     assert result.status == "error"
     assert result.detail["error"].startswith("RuntimeError: ")
+
+
+def _package():
+    return SkillPackage(name="alpha", description="demo", path=None, output_contract=["指标"])
+
+
+def test_outcome_runner_pass_with_sections(tmp_path):
+    class Scripted:
+        def __init__(self, responses):
+            self._responses = list(responses)
+
+        def chat(self, messages, system=None, tools=None):
+            return self._responses.pop(0)
+
+    client = Scripted(
+        [
+            LLMResponse(
+                content=[ToolUseBlock("t1", "alpha.query", {"sql": "SELECT 1"})],
+                stop_reason="tool_use",
+                usage={},
+            ),
+            LLMResponse(content=[TextBlock("## 指标\n5")], stop_reason="end_turn", usage={}),
+        ]
+    )
+    case = _case(layer="outcome", input="出报表", must_contain=["指标"])
+    result = OutcomeRunner(Settings(audit_dir=str(tmp_path / "a")), client).run_case(
+        case, _package(), _registry()
+    )
+    assert result.status == "pass" and result.detail["missing"] == []
+
+
+def test_outcome_runner_fail_missing_section(tmp_path):
+    class Scripted:
+        def chat(self, messages, system=None, tools=None):
+            return LLMResponse(content=[TextBlock("太短")], stop_reason="end_turn", usage={})
+
+    case = _case(layer="outcome", input="出报表", must_contain=["指标", "发现"])
+    result = OutcomeRunner(Settings(audit_dir=str(tmp_path / "a")), Scripted()).run_case(
+        case, _package(), _registry()
+    )
+    assert result.status == "fail" and result.detail["missing"] == ["指标", "发现"]
+
+
+def test_outcome_runner_output_gate_repair_path(tmp_path):
+    """输出门禁自修链路在评测中照常工作：缺小节 → 自修 → 复检通过 → pass。"""
+
+    class Scripted:
+        def __init__(self, responses):
+            self._responses = list(responses)
+
+        def chat(self, messages, system=None, tools=None):
+            return self._responses.pop(0)
+
+    client = Scripted(
+        [
+            LLMResponse(
+                content=[ToolUseBlock("t1", "alpha.query", {"sql": "SELECT 1"})],
+                stop_reason="tool_use",
+                usage={},
+            ),
+            LLMResponse(content=[TextBlock("缺小节")], stop_reason="end_turn", usage={}),
+            LLMResponse(content=[TextBlock("## 指标\n5")], stop_reason="end_turn", usage={}),
+        ]
+    )
+    case = _case(layer="outcome", input="出报表", must_contain=["指标"])
+    result = OutcomeRunner(Settings(audit_dir=str(tmp_path / "a")), client).run_case(
+        case, _package(), _registry()
+    )
+    assert result.status == "pass"  # 修复稿复检通过，评测不关心中间拦截
+
+
+def test_outcome_runner_rounds_exhausted_is_fail(tmp_path):
+    class NeverFinal:
+        def chat(self, messages, system=None, tools=None):
+            return LLMResponse(
+                content=[ToolUseBlock("t1", "alpha.query", {"n": 1})],
+                stop_reason="tool_use",
+                usage={},
+            )
+
+    case = _case(layer="outcome", input="出报表", must_contain=["指标"])
+    result = OutcomeRunner(Settings(audit_dir=str(tmp_path / "a")), NeverFinal()).run_case(
+        case, _package(), _registry()
+    )
+    assert result.status == "fail" and "ReAct 循环超过" in result.detail["error"]

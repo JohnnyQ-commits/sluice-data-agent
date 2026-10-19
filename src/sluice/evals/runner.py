@@ -160,3 +160,54 @@ class BehaviorRunner:
             "pass" if ok else "fail",
             {"used_tools": used, "expect_skill": case.expect_skill},
         )
+
+
+class OutcomeRunner:
+    """① 产出评测：完整 ReAct 循环 + 确定性断言（must_contain）。
+
+    语义断言（judge_rubric + LLM-as-judge）由 T7 接入本类。
+    """
+
+    def __init__(
+        self, settings: Settings, client: LLMClient, judge_client: LLMClient | None = None
+    ):
+        self._settings = settings
+        self._client = client
+        self._judge_client = judge_client
+
+    def run_case(self, case: EvalCase, package: SkillPackage, registry: ToolRegistry) -> CaseResult:
+        chain = GuardrailChain(self._settings, [package])
+        rt = ReActRuntime(
+            self._client,
+            registry,
+            system=build_system([package]),
+            max_rounds=self._settings.react_max_rounds,
+            guardrails=chain,
+        )
+        events: list[dict] = []
+        try:
+            answer = rt.run(case.input, on_event=events.append)
+        except SluiceError as exc:  # 轮次耗尽/超预算 = 产出失败（这层是 fail 不是 error）
+            return CaseResult(case.skill, case.name, case.layer, "fail", {"error": str(exc)})
+        missing = [s for s in case.must_contain if s not in answer]
+        detail: dict = {"missing": missing, "answer_head": answer[:200]}
+        if case.judge_rubric and self._judge_client is not None:
+            from .judge import judge_output  # T7 落地后生效；此前 judge_rubric 用例不带 judge 跑
+
+            items = judge_output(self._judge_client, answer, case.judge_rubric)
+            valid_scores = [i["score"] for i in items if i["valid"]]
+            avg = sum(valid_scores) / len(valid_scores) if valid_scores else None
+            detail["judge_items"] = items
+            detail["judge_avg"] = avg
+            detail["judge_valid"] = bool(valid_scores)
+            if avg is not None and avg < self._settings.eval_judge_threshold:
+                missing = missing or [
+                    f"judge 均分 {avg:.2f} < {self._settings.eval_judge_threshold}"
+                ]
+        return CaseResult(
+            case.skill,
+            case.name,
+            case.layer,
+            "pass" if not missing else "fail",
+            detail,
+        )
