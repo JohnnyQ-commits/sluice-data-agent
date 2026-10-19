@@ -46,7 +46,8 @@ def test_credit_skill_registered_with_prefix_and_contract(credit_tool):
 
 def test_credit_tool_queries_credit_table(credit_tool):
     result = credit_tool.execute({"sql": "SELECT COUNT(*) AS n FROM credit_applications"})
-    assert result.is_error is False and "1" in result.content
+    assert result.is_error is False
+    assert result.content.rstrip().endswith("| 1 |")  # 表格末行 = 单行计数 1
 
 
 def test_credit_tool_errors_on_missing_table(credit_tool):
@@ -66,8 +67,9 @@ def test_input_gate_blocks_credit_tool_cross_domain(credit_tool):
         credit_tool,
     )
     assert reason_detail is not None
-    reason, _detail = reason_detail
-    assert "不在" in reason or "allowlist" in reason or "sales" in reason
+    reason, detail = reason_detail
+    assert reason.startswith("SQL 引用了不在册的表")
+    assert detail["unknown_tables"] == ["sales"]
 
 
 def test_credit_tool_allowlist_declared(credit_tool):

@@ -52,6 +52,11 @@ def validate_schema(args: dict, parameters: dict) -> str | None:
     return None
 
 
+def _strip_literals(sql: str) -> str:
+    """剥字符串字面量（统一替换为 ''），防 LIKE '%from x%' 一类内容干扰表名/别名解析。"""
+    return re.sub(r"'[^']*'", "''", sql)
+
+
 def extract_sql_tables(sql: str) -> set[str]:
     """提取 SQL 引用的表名（FROM/JOIN 后标识符，去引号与 schema/db 前缀）。
 
@@ -60,7 +65,7 @@ def extract_sql_tables(sql: str) -> set[str]:
     CTE 别名（``x as (``）一并计入——WITH 自引用是合法读法，不能误报幻觉表。
     方向性设计：宁可多放（别名误入白名单），不可错拦合法查询。
     """
-    sql = re.sub(r"'[^']*'", "''", sql)  # 剥字符串字面量，防 LIKE '%from x%' 误拦
+    sql = _strip_literals(sql)
     tables = set()
     for raw in _SQL_TABLE_RE.findall(sql):
         name = raw.replace("`", "").replace('"', "").replace("'", "")
@@ -86,7 +91,10 @@ class InputGate:
         allowlist = getattr(tool, "table_allowlist", None)
         if callable(allowlist):
             sql = tu.input.get("sql", "") if isinstance(tu.input, dict) else ""
-            referenced = extract_sql_tables(sql) - cte_aliases(sql)
+            stripped = _strip_literals(sql)
+            # 别名同样在剥字面量后的文本上识别——字面量里的 "x as (" 不能当作别名扣减，
+            # 否则 FROM evil WHERE note = 'evil as (' 会让幻觉表 evil 漏拦
+            referenced = extract_sql_tables(sql) - cte_aliases(stripped)
             unknown = referenced - {t.lower() for t in allowlist()}
             if unknown:
                 return (

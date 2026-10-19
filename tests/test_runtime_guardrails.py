@@ -178,6 +178,7 @@ def test_guardrails_disabled_is_kill_switch(tmp_path):
     events = []
     assert rt.run("go", on_event=events.append) == "完成"
     assert not [e for e in events if e["type"] == "guardrail"]
+    assert not (tmp_path / "a5" / "audit.jsonl").exists()  # kill switch 也不写审计
     obs_events = [e for e in events if e["type"] == "observation"]
     assert "未知工具" in obs_events[0]["observation"]
 
@@ -222,6 +223,24 @@ def test_repair_round_tool_use_dropped_then_degraded(tmp_path):
     audit_lines = (tmp_path / "a7" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
     kinds = [json.loads(line)["kind"] for line in audit_lines]
     assert kinds == ["output_rejected", "repair_tool_use_dropped", "output_degraded"]
+
+
+def test_blocked_tool_does_not_inject_contract(tmp_path):
+    """被拦的幻觉工具不进 used_tools → 本轮无契约可查，缺小节回答直接放行（不触发自修）。"""
+    registry = ToolRegistry()
+    registry.register(ReportTool())
+    settings = Settings(audit_dir=str(tmp_path / "a8"))
+    chain = GuardrailChain(settings)
+    chain._contracts = {"demo": ["核心指标"]}  # demo 契约在册，但本轮没有任何合法 demo 调用
+    client = ScriptedClient([_call("ghost_tool"), _final("缺小节的回答")])
+    rt = ReActRuntime(client, registry, max_rounds=5, guardrails=chain)
+    events = []
+    answer = rt.run("go", on_event=events.append)
+    assert answer == "缺小节的回答"
+    g = [e for e in events if e["type"] == "guardrail"]
+    assert [e["gate"] for e in g] == ["input"]  # 只有输入门禁拦幻觉工具，无 output 链路
+    audit_lines = (tmp_path / "a8" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line)["kind"] for line in audit_lines] == ["input_blocked"]
 
 
 def test_resolve_audit_dir_keeps_explicit(tmp_path, monkeypatch):

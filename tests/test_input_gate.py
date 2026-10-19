@@ -99,5 +99,14 @@ def test_input_gate_allows_cte_self_reference():
     assert InputGate().check(ToolUseBlock("t1", "stub", {"sql": sql}), tool) is None
 
 
+def test_input_gate_literal_not_treated_as_cte_alias():
+    """字符串字面量里的 "x as (" 不是 CTE 别名——否则 'evil as (' 会让幻觉表 evil 漏拦。"""
+    tool = SqlTool()
+    tool.table_allowlist = lambda: ["sales"]
+    sql = "SELECT * FROM evil WHERE note = 'evil as ('"
+    verdict = InputGate().check(ToolUseBlock("t1", "stub", {"sql": sql}), tool)
+    assert verdict is not None and verdict[1]["unknown_tables"] == ["evil"]
+
+
 def test_input_gate_passes_valid_call():
     assert InputGate().check(ToolUseBlock("t1", "stub", {"sql": "select 1"}), SqlTool()) is None
