@@ -47,6 +47,9 @@ class EvalCase:
                 raise ValueError(f"评测用例缺少必填字段 {key}: {raw!r}")
         if raw["layer"] not in LAYERS:
             raise ValueError(f"未知评测层 {raw['layer']!r}（应为 {'/'.join(LAYERS)}）")
+        for key in ("must_contain", "judge_rubric", "script", "expect_guardrails"):
+            if key in raw and not isinstance(raw[key], list):
+                raise ValueError(f"字段 {key} 应为 list，收到 {type(raw[key]).__name__}: {raw!r}")
         return cls(
             skill=skill,
             name=raw["name"],
@@ -91,12 +94,18 @@ class EvalReport:
         return sum(1 for r in counted if r.status == "pass") / len(counted)
 
     def judge_avg(self) -> float | None:
-        """全体 outcome 用例的有效 judge 均分；无有效分返回 None。"""
-        scores = [
-            r.detail["judge_avg"]
-            for r in self.results
-            if r.layer == "outcome" and r.detail.get("judge_valid")
-        ]
+        """全体 outcome 用例的有效 judge 均分；无有效分返回 None。
+
+        脏 detail（缺 judge_avg 键 / 字符串分数 / bool 分数 / judge_valid 非严格 True）
+        一律静默跳过，评测层宁缺不错，不因单条脏数据丢整份报告。
+        """
+        scores = []
+        for r in self.results:
+            if r.layer != "outcome" or r.detail.get("judge_valid") is not True:
+                continue
+            value = r.detail.get("judge_avg")
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                scores.append(value)
         if not scores:
             return None
         return sum(scores) / len(scores)
