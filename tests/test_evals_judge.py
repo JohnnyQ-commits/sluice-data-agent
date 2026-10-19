@@ -60,3 +60,37 @@ def test_judge_client_exception_all_invalid():
 
 def test_normalize_collapses_whitespace():
     assert _normalize("a  b\nc") == "abc"
+
+
+def test_score_string_digit_coerced():
+    """真实 LLM 高频形态 "score": "4" → coerce 后有效，不判无效致 judge_avg 空转。"""
+    reply = '{"items": [{"item": "口径", "score": "4", "quote": "环比 +15%"}]}'
+    items = judge_output(StubJudge(reply), ANSWER, ["口径"])
+    assert items[0]["valid"] is True and items[0]["score"] == 4
+
+
+def test_score_whole_float_coerced():
+    reply = '{"items": [{"item": "口径", "score": 4.0, "quote": "环比 +15%"}]}'
+    items = judge_output(StubJudge(reply), ANSWER, ["口径"])
+    assert items[0]["valid"] is True and items[0]["score"] == 4
+
+
+def test_score_bool_rejected():
+    """bool 守卫钉死：True/False 永不折算成分数（防后人把 isinstance 排除简化掉）。"""
+    reply = '{"items": [{"item": "口径", "score": true, "quote": "环比 +15%"}]}'
+    items = judge_output(StubJudge(reply), ANSWER, ["口径"])
+    assert items[0]["valid"] is False and items[0]["score"] is None
+
+
+def test_item_echo_with_numbering_matches():
+    """judge 回显维度带序号前缀（prompt 里是 "1. 口径"）→ 剥前缀归一化后仍命中 rubric。"""
+    reply = '{"items": [{"item": "1. 口径清晰", "score": 4, "quote": "环比 +15%"}]}'
+    items = judge_output(StubJudge(reply), ANSWER, ["口径清晰"])
+    assert items[0]["valid"] is True and items[0]["item"] == "口径清晰"
+
+
+def test_markdown_fenced_json_still_parsed():
+    """markdown 围栏包 JSON：贪婪 \\{.*\\} 命中围栏内对象——钉住防回归。"""
+    reply = '好的，评分如下：\n```json\n{"items": [{"item": "口径", "score": 4, "quote": "环比 +15%"}]}\n```'
+    items = judge_output(StubJudge(reply), ANSWER, ["口径"])
+    assert items[0]["valid"] is True and items[0]["score"] == 4
