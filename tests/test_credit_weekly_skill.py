@@ -49,10 +49,25 @@ def test_credit_tool_queries_credit_table(credit_tool):
     assert result.is_error is False and "1" in result.content
 
 
-def test_credit_tool_blocks_cross_domain_table(credit_tool):
-    """表级权限：跨域查 sales 应被工具自身拒绝（sales 不在临时库里 → SQL 报错 is_error=True）。"""
+def test_credit_tool_errors_on_missing_table(credit_tool):
+    """临时库里没有 sales 表 → SQL 报错 is_error=True（工具层兜底，非 allowlist 拦截路径）。"""
     result = credit_tool.execute({"sql": "SELECT * FROM sales"})
     assert result.is_error is True
+
+
+def test_input_gate_blocks_credit_tool_cross_domain(credit_tool):
+    """真正的表级拦截在 InputGate：credit SQL 引用 sales 应被 allowlist 门禁拒绝。"""
+    from sluice.guardrails.input_gate import InputGate
+    from sluice.llm.types import ToolUseBlock
+
+    gate = InputGate()
+    reason_detail = gate.check(
+        ToolUseBlock("t1", "credit-weekly.query_credit", {"sql": "SELECT * FROM sales"}),
+        credit_tool,
+    )
+    assert reason_detail is not None
+    reason, _detail = reason_detail
+    assert "不在" in reason or "allowlist" in reason or "sales" in reason
 
 
 def test_credit_tool_allowlist_declared(credit_tool):

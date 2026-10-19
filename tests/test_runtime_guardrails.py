@@ -1,6 +1,7 @@
 """GuardrailChain + ReAct 循环接线测试：四拦截点 / 定向自修 / 降级交付 / kill switch。"""
 
 import json
+from pathlib import Path
 from typing import ClassVar
 
 import pytest
@@ -239,4 +240,4 @@ def test_resolve_audit_dir_anchors_default(tmp_path, monkeypatch):
 
     monkeypatch.delenv("SLUICE_AUDIT_DIR", raising=False)
     s = resolve_audit_dir(Settings())
-    assert s.audit_dir.endswith("audit")
+    assert Path(s.audit_dir).is_absolute() and s.audit_dir.endswith("audit")
