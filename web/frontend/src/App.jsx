@@ -27,6 +27,21 @@ function EventLine({ ev }) {
       </details>
     );
   }
+  if (ev.type === "guardrail") {
+    const style =
+      ev.action === "blocked"
+        ? "border-amber-400 bg-amber-50 text-amber-800"
+        : ev.action === "repaired"
+          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+          : "border-red-300 bg-red-50 text-red-700";
+    const label =
+      ev.action === "blocked" ? "拦截" : ev.action === "repaired" ? "自修通过" : "降级交付";
+    return (
+      <div className={`rounded border p-2 text-sm ${style}`}>
+        🛡 门禁[{ev.gate}] {label}（第 {ev.round} 轮）：{ev.reason}
+      </div>
+    );
+  }
   if (ev.type === "error") {
     return (
       <div className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-700">
