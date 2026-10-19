@@ -8,12 +8,14 @@ from sluice.config.settings import Settings
 from sluice.evals.model import EvalCase
 from sluice.evals.runner import (
     EVAL_MAX_ROUNDS,
+    BehaviorRunner,
     GuardrailRunner,
     ScriptedClient,
     ScriptExhaustedError,
     _response_from_spec,
 )
 from sluice.guardrails.chain import GuardrailChain
+from sluice.llm.types import LLMResponse, TextBlock, ToolUseBlock
 from sluice.tools.base import Tool, ToolResult
 from sluice.tools.registry import ToolRegistry
 
@@ -131,9 +133,6 @@ def test_guardrail_runner_replay_is_model_parrot_degrades(tmp_path, monkeypatch)
 
 
 def test_behavior_runner_routes_to_expected_skill():
-    from sluice.evals.runner import BehaviorRunner
-    from sluice.llm.types import LLMResponse, ToolUseBlock
-
     class RouteClient:
         def chat(self, messages, system=None, tools=None):
             return LLMResponse(
@@ -148,9 +147,6 @@ def test_behavior_runner_routes_to_expected_skill():
 
 
 def test_behavior_runner_wrong_skill_fails():
-    from sluice.evals.runner import BehaviorRunner
-    from sluice.llm.types import LLMResponse, ToolUseBlock
-
     class RouteClient:
         def chat(self, messages, system=None, tools=None):
             return LLMResponse(
@@ -163,9 +159,6 @@ def test_behavior_runner_wrong_skill_fails():
 
 
 def test_behavior_runner_greeting_no_tool():
-    from sluice.evals.runner import BehaviorRunner
-    from sluice.llm.types import LLMResponse, TextBlock
-
     class ChatClient:
         def chat(self, messages, system=None, tools=None):
             return LLMResponse(content=[TextBlock("你好！")], stop_reason="end_turn", usage={})
@@ -173,3 +166,16 @@ def test_behavior_runner_greeting_no_tool():
     case = _case(layer="behavior", input="你好", expect_skill="")
     result = BehaviorRunner(ChatClient()).run_case(case, [], _registry())
     assert result.status == "pass"
+
+
+def test_behavior_runner_chat_exception_is_error():
+    """client.chat 抛异常（网关抖动等）→ 兜底归 error（带异常类型前缀），不炸整批评测。"""
+
+    class ExplodesClient:
+        def chat(self, messages, system=None, tools=None):
+            raise RuntimeError("网关抖动")
+
+    case = _case(layer="behavior", input="出报表", expect_skill="alpha")
+    result = BehaviorRunner(ExplodesClient()).run_case(case, [], _registry())
+    assert result.status == "error"
+    assert result.detail["error"].startswith("RuntimeError: ")

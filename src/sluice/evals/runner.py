@@ -6,6 +6,8 @@ pytest 套件保持零 API key 可跑（P0 以来的红线）。
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ..config.settings import Settings
 from ..exceptions import SluiceError
 from ..guardrails.chain import GuardrailChain
@@ -14,6 +16,10 @@ from ..runtime.loop import ReActRuntime
 from ..runtime.prompt import build_system
 from ..tools.registry import ToolRegistry
 from .model import CaseResult, EvalCase
+
+if TYPE_CHECKING:
+    from ..llm.client import LLMClient
+    from ..skills.loader import SkillPackage
 
 EVAL_MAX_ROUNDS = 8  # 门禁用例走完 拦截→自纠→final 足够，轮次上限防剧本行为失控
 
@@ -121,18 +127,32 @@ class BehaviorRunner:
     真实 LLM 下每用例仅一次 API 调用，秒级回归；测试用桩 client 注入。
     """
 
-    def __init__(self, client):
+    def __init__(self, client: LLMClient):
         self._client = client
 
-    def run_case(self, case: EvalCase, packages: list, registry: ToolRegistry) -> CaseResult:
-        response = self._client.chat(
-            [Message("user", [TextBlock(case.input)])],
-            system=build_system(packages),
-            tools=registry.to_defs(),
-        )
-        used = [tu.name for tu in response.tool_uses]
-        prefixes = {n.split(".", 1)[0] for n in used if "." in n}
-        ok = (case.expect_skill in prefixes) if case.expect_skill else not used
+    def run_case(
+        self, case: EvalCase, packages: list[SkillPackage], registry: ToolRegistry
+    ) -> CaseResult:
+        try:
+            response = self._client.chat(
+                [Message("user", [TextBlock(case.input)])],
+                system=build_system(packages),
+                tools=registry.to_defs(),
+            )
+            used = [tu.name for tu in response.tool_uses]
+            # 内置无点工具不算 skill 命中（仍计入 used）
+            prefixes = {n.split(".", 1)[0] for n in used if "." in n}
+            ok = (case.expect_skill in prefixes) if case.expect_skill else not used
+        except SluiceError as exc:  # 网关等已知错误 = 用例归 error，不炸整批评测
+            return CaseResult(case.skill, case.name, case.layer, "error", {"error": str(exc)})
+        except Exception as exc:  # noqa: BLE001 — 坏用例兜底：单个用例归 error，不炸整批评测
+            return CaseResult(
+                case.skill,
+                case.name,
+                case.layer,
+                "error",
+                {"error": f"{type(exc).__name__}: {exc}"},
+            )
         return CaseResult(
             case.skill,
             case.name,
