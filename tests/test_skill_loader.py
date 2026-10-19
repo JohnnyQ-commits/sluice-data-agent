@@ -218,3 +218,45 @@ def test_evals_broken_module_skips_package_not_crash(tmp_path):
     (good / "SKILL.md").write_text("---\nname: good\ndescription: d\n---\n# t\n", encoding="utf-8")
     packages = SkillLoader().load(root, ToolRegistry())
     assert [p.name for p in packages] == ["good"]
+
+
+def test_evals_dict_cases_warned_and_ignored(tmp_path, caplog):
+    """CASES 为 dict → 不静默转 key 列表，置 [] 且包正常加载（不跳包）。"""
+    d = tmp_path / "s"
+    (d / "evals").mkdir(parents=True)
+    (d / "SKILL.md").write_text("---\nname: s\ndescription: d\n---\n# t\n", encoding="utf-8")
+    (d / "evals" / "cases.py").write_text(
+        "CASES = {'c1': {'name': 'c1', 'layer': 'guardrail'}}", encoding="utf-8"
+    )
+    with caplog.at_level("WARNING"):
+        packages = SkillLoader().load(tmp_path, ToolRegistry())
+    assert len(packages) == 1
+    assert packages[0].evals == []
+    assert any("CASES 应为 list" in r.message for r in caplog.records)
+
+
+def test_tools_and_evals_coexist_same_package(tmp_path):
+    """tools.py 与 evals/cases.py 同包共存：TOOLS 与 CASES 都正确加载。"""
+    d = tmp_path / "s"
+    (d / "evals").mkdir(parents=True)
+    (d / "SKILL.md").write_text("---\nname: s\ndescription: d\n---\n# t\n", encoding="utf-8")
+    (d / "tools.py").write_text(TOOLS_PY, encoding="utf-8")
+    (d / "evals" / "cases.py").write_text(
+        "CASES = [{'name': 'c1', 'layer': 'guardrail'}]", encoding="utf-8"
+    )
+    packages = SkillLoader().load(tmp_path, ToolRegistry())
+    assert packages[0].tools[0].name == "s.render"
+    assert packages[0].evals == [{"name": "c1", "layer": "guardrail"}]
+
+
+def test_evals_reload_same_content(tmp_path):
+    """同一 skill 连续 load 两次 → 两次 evals 内容一致（无串扰）。"""
+    d = tmp_path / "s"
+    (d / "evals").mkdir(parents=True)
+    (d / "SKILL.md").write_text("---\nname: s\ndescription: d\n---\n# t\n", encoding="utf-8")
+    (d / "evals" / "cases.py").write_text(
+        "CASES = [{'name': 'c1', 'layer': 'guardrail'}]", encoding="utf-8"
+    )
+    first = SkillLoader().load(tmp_path, ToolRegistry())[0].evals
+    second = SkillLoader().load(tmp_path, ToolRegistry())[0].evals
+    assert first == second == [{"name": "c1", "layer": "guardrail"}]

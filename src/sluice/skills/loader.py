@@ -95,11 +95,13 @@ class SkillLoader:
                     _load_tools(d / "tools.py", meta["name"]) if (d / "tools.py").is_file() else []
                 )
                 evals_path = d / "evals" / "cases.py"
-                evals = (
-                    list(_exec_module(evals_path, meta["name"], "CASES") or [])
-                    if evals_path.is_file()
-                    else []
-                )
+                evals: list = []
+                if evals_path.is_file():
+                    raw_cases = _exec_module(evals_path, meta["name"], "CASES")
+                    if isinstance(raw_cases, list):
+                        evals = list(raw_cases)
+                    elif raw_cases is not None:
+                        logger.warning("evals/cases.py 的 CASES 应为 list，已忽略: %s", d.name)
             except Exception as e:  # noqa: BLE001 - 单包异常不殃及其他 skill
                 logger.warning("Skill 包加载失败，已跳过 %s: %s", d.name, e)
                 continue
