@@ -9,8 +9,9 @@ from __future__ import annotations
 from ..config.settings import Settings
 from ..exceptions import SluiceError
 from ..guardrails.chain import GuardrailChain
-from ..llm.types import LLMResponse, TextBlock, ToolUseBlock
+from ..llm.types import LLMResponse, Message, TextBlock, ToolUseBlock
 from ..runtime.loop import ReActRuntime
+from ..runtime.prompt import build_system
 from ..tools.registry import ToolRegistry
 from .model import CaseResult, EvalCase
 
@@ -49,6 +50,7 @@ def _response_from_spec(spec: dict) -> LLMResponse:
 class ScriptedClient:
     """评测剧本回放（与 tests 同款模式，guardrail 层负向用例专用）。
 
+    回放仅可能被输出自修轮消费，语义=模型复读（复检仍不过只产 degraded，产不出 repaired）。
     末条最多回放 1 次，再次耗尽抛 ScriptExhaustedError：缺 final 的剧本归 error
     而不是在断言处炸掉评测引擎，也不会靠无限回放伪造自修轮事件制造假 pass。
     calls 记录每次 chat 摘要（behavior 层复用本构件时免改）。
@@ -110,4 +112,31 @@ class GuardrailRunner:
             case.layer,
             "pass" if not missing else "fail",
             {"expected": case.expect_guardrails, "got": got},
+        )
+
+
+class BehaviorRunner:
+    """② 单轮行为评测：一次 chat 调用（无 ReAct 循环），断言意图→Skill 路由与工具选择。
+
+    真实 LLM 下每用例仅一次 API 调用，秒级回归；测试用桩 client 注入。
+    """
+
+    def __init__(self, client):
+        self._client = client
+
+    def run_case(self, case: EvalCase, packages: list, registry: ToolRegistry) -> CaseResult:
+        response = self._client.chat(
+            [Message("user", [TextBlock(case.input)])],
+            system=build_system(packages),
+            tools=registry.to_defs(),
+        )
+        used = [tu.name for tu in response.tool_uses]
+        prefixes = {n.split(".", 1)[0] for n in used if "." in n}
+        ok = (case.expect_skill in prefixes) if case.expect_skill else not used
+        return CaseResult(
+            case.skill,
+            case.name,
+            case.layer,
+            "pass" if ok else "fail",
+            {"used_tools": used, "expect_skill": case.expect_skill},
         )
