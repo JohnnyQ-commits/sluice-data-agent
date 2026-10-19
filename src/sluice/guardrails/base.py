@@ -37,6 +37,6 @@ class AuditLog:
 
     def append(self, entry: dict) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), **entry}
+        entry = {**entry, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
         with self._path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")

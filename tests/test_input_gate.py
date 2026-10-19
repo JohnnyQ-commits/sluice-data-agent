@@ -43,6 +43,12 @@ def test_validate_schema_pass():
     assert validate_schema({"sql": "select 1"}, SqlTool.parameters) is None
 
 
+def test_validate_schema_unknown_type_passes():
+    """未声明/未知的 schema type 放行——门禁只拦确定性错误，不崩自己。"""
+    schema = {"type": "object", "properties": {"x": {"type": "null"}}}
+    assert validate_schema({"x": None}, schema) is None
+
+
 def test_extract_sql_tables_basic():
     assert extract_sql_tables("SELECT * FROM sales s JOIN cities c ON s.c = c.id") == {
         "sales",
@@ -53,6 +59,10 @@ def test_extract_sql_tables_basic():
 def test_extract_sql_tables_cte_and_quoting():
     sql = 'WITH t AS (SELECT 1) SELECT * FROM `main`.`t` JOIN "dim_date"'
     assert extract_sql_tables(sql) == {"t", "dim_date"}
+
+
+def test_extract_sql_tables_ignores_string_literals():
+    assert extract_sql_tables("SELECT * FROM sales WHERE note LIKE '%from users%'") == {"sales"}
 
 
 def _ghost_db(tmp_path):
@@ -82,7 +92,7 @@ def test_input_gate_blocks_hallucinated_table(tmp_path):
     assert verdict[1]["unknown_tables"] == ["ghost"]
 
 
-def test_input_gate_allows_cte_self_reference(tmp_path):
+def test_input_gate_allows_cte_self_reference():
     tool = SqlTool()
     tool.table_allowlist = lambda: ["sales"]
     sql = "WITH t AS (SELECT id FROM sales) SELECT * FROM t"

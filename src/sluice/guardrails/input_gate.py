@@ -38,12 +38,15 @@ def validate_schema(args: dict, parameters: dict) -> str | None:
             continue
         expected = spec.get("type")
         if expected:
-            # bool 是 int 子类，数字类型须显式排除
-            ok = isinstance(value, _TYPE_CHECKS[expected]) and not (
-                isinstance(value, bool) and expected in ("integer", "number")
-            )
-            if not ok:
-                return f"参数 {key} 类型应为 {expected}，收到 {type(value).__name__}"
+            checker = _TYPE_CHECKS.get(expected)
+            if checker is not None:
+                # bool 是 int 子类，数字类型须显式排除
+                ok = isinstance(value, checker) and not (
+                    isinstance(value, bool) and expected in ("integer", "number")
+                )
+                if not ok:
+                    return f"参数 {key} 类型应为 {expected}，收到 {type(value).__name__}"
+            # 未知 type 视为放行——门禁只拦确定性错误，不崩自己
         if "enum" in spec and value not in spec["enum"]:
             return f"参数 {key} 取值 {value!r} 不在允许范围 {spec['enum']}"
     return None
@@ -52,9 +55,12 @@ def validate_schema(args: dict, parameters: dict) -> str | None:
 def extract_sql_tables(sql: str) -> set[str]:
     """提取 SQL 引用的表名（FROM/JOIN 后标识符，去引号与 schema/db 前缀）。
 
+    已知局限：FROM a, b 逗号多表只捕首表（宁放方向，不为此加正则复杂度）。
+    返回集含 CTE 别名并集，仅供独立使用；InputGate 比对前会扣除 CTE 别名。
     CTE 别名（``x as (``）一并计入——WITH 自引用是合法读法，不能误报幻觉表。
     方向性设计：宁可多放（别名误入白名单），不可错拦合法查询。
     """
+    sql = re.sub(r"'[^']*'", "''", sql)  # 剥字符串字面量，防 LIKE '%from x%' 误拦
     tables = set()
     for raw in _SQL_TABLE_RE.findall(sql):
         name = raw.replace("`", "").replace('"', "").replace("'", "")
