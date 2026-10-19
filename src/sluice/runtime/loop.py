@@ -47,7 +47,8 @@ class ReActRuntime:
     def run(self, user_input: str, on_event: Callable[[dict], None] | None = None) -> str:
         # run 级 on_event 非 None 时覆盖构造器值（Flask 每请求独立队列）
         effective = on_event if on_event is not None else self._on_event
-        self.trace = []
+        # trace 局部累积、结束原子赋值：并发 run 互不串写，结束后 last-writer-wins
+        local_trace: list[dict] = []
         messages: list[Message] = [Message("user", [TextBlock(user_input)])]
 
         try:
@@ -60,7 +61,7 @@ class ReActRuntime:
 
                 if not tool_uses:  # Final Answer
                     self._emit(effective, {"type": "final", "answer": response.text})
-                    self._record(round_no, response, [])
+                    local_trace.append(self._record(round_no, response, []))
                     return response.text
 
                 messages.append(Message("assistant", response.content))
@@ -88,12 +89,14 @@ class ReActRuntime:
                     )
                     observations.append(obs)
                 messages.append(Message("user", observations))
-                self._record(round_no, response, observations)
+                local_trace.append(self._record(round_no, response, observations))
 
             raise RoundsExhaustedError(f"ReAct 循环超过 {self._max_rounds} 轮未产出最终回答")
         except Exception as exc:
             self._emit(effective, {"type": "error", "message": str(exc)})
             raise
+        finally:
+            self.trace = local_trace  # 原子赋值：CLI 语义不变（run 后 rt.trace 仍可用）
 
     @staticmethod
     def _emit(callback: Callable[[dict], None] | None, event: dict) -> None:
@@ -114,19 +117,18 @@ class ReActRuntime:
         except Exception as exc:  # noqa: BLE001 — 工具异常回喂模型自纠
             return ToolResultBlock(tu.id, f"工具执行异常: {exc}", is_error=True)
 
-    def _record(self, round_no: int, response: LLMResponse, observations: list) -> None:
-        self.trace.append(
-            {
-                "round": round_no,
-                "thought": response.text,
-                "tool_calls": [
-                    {
-                        "name": tu.name,
-                        "args": tu.input,
-                        "observation": obs.content,
-                        "is_error": obs.is_error,
-                    }
-                    for tu, obs in zip(response.tool_uses, observations)
-                ],
-            }
-        )
+    @staticmethod
+    def _record(round_no: int, response: LLMResponse, observations: list) -> dict:
+        return {
+            "round": round_no,
+            "thought": response.text,
+            "tool_calls": [
+                {
+                    "name": tu.name,
+                    "args": tu.input,
+                    "observation": obs.content,
+                    "is_error": obs.is_error,
+                }
+                for tu, obs in zip(response.tool_uses, observations)
+            ],
+        }

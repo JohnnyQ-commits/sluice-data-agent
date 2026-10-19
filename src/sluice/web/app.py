@@ -20,6 +20,11 @@ from ..tools.registry import ToolRegistry
 _FRONTEND_DIST = Path(__file__).resolve().parents[3] / "web" / "frontend" / "dist"
 
 
+def _stream_idle_timeout(settings: Settings) -> float:
+    """SSE 空闲超时：盖过一次合法 LLM 调用的最长静默（2 倍 + 余量），不误杀健康长轮次。"""
+    return settings.llm_timeout_seconds * 2 + 60
+
+
 def create_app(client=None, registry=None, runtime=None, skills_dir="skills") -> Flask:
     app = Flask(__name__, static_folder=None)
     settings = Settings()
@@ -35,7 +40,7 @@ def create_app(client=None, registry=None, runtime=None, skills_dir="skills") ->
         max_rounds=settings.react_max_rounds,
     )
 
-    runs: dict[str, dict] = {}
+    runs: dict[str, queue.Queue] = {}
 
     @app.post("/api/chat")
     def chat():
@@ -44,7 +49,7 @@ def create_app(client=None, registry=None, runtime=None, skills_dir="skills") ->
             return jsonify({"error": "message 必填"}), 400
         run_id = uuid.uuid4().hex
         q: queue.Queue = queue.Queue()
-        runs[run_id] = {"queue": q, "done": False}
+        runs[run_id] = q
 
         def worker():
             try:
@@ -52,32 +57,35 @@ def create_app(client=None, registry=None, runtime=None, skills_dir="skills") ->
                 runtime.run(body["message"], on_event=q.put)
             except Exception:  # noqa: BLE001, S110 — error 事件已由 runtime 发出，这里仅收尾防线程裸死
                 pass
-            finally:
-                runs[run_id]["done"] = True
 
         threading.Thread(target=worker, daemon=True).start()
         return jsonify({"run_id": run_id})
 
     @app.get("/api/stream/<run_id>")
     def stream(run_id: str):
-        run = runs.get(run_id)
-        if run is None:
+        q = runs.get(run_id)
+        if q is None:
             return jsonify({"error": "未知 run_id"}), 404
 
         def generate():
-            q = run["queue"]
             while True:
                 try:
-                    event = q.get(timeout=60)
+                    event = q.get(timeout=_stream_idle_timeout(settings))
                 except queue.Empty:
+                    runs.pop(run_id, None)
                     yield 'event: end\ndata: {"type": "timeout"}\n\n'
                     return
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
                 if event.get("type") in ("final", "error"):
+                    runs.pop(run_id, None)
                     yield "event: end\ndata: {}\n\n"
                     return
 
-        return Response(generate(), mimetype="text/event-stream")
+        return Response(
+            generate(),
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no-cache"},
+        )
 
     @app.get("/api/skills")
     def skills():

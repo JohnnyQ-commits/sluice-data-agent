@@ -4,11 +4,12 @@ from typing import ClassVar
 
 import pytest
 
+from sluice.config.settings import Settings
 from sluice.llm.types import LLMResponse, TextBlock, ToolResultBlock, ToolUseBlock
 from sluice.runtime.loop import ReActRuntime
 from sluice.tools.base import Tool, ToolResult
 from sluice.tools.registry import ToolRegistry
-from sluice.web.app import create_app
+from sluice.web.app import _stream_idle_timeout, create_app
 
 
 class OkTool(Tool):
@@ -42,7 +43,9 @@ class SlowFakeClient:
 @pytest.fixture
 def app():
     fake = SlowFakeClient()
-    app = create_app(runtime=ReActRuntime(fake, ToolRegistry()))
+    registry = ToolRegistry()
+    registry.register(OkTool())
+    app = create_app(runtime=ReActRuntime(fake, registry), skills_dir=None)
     app.config["TESTING"] = True
     app.config["RELEASE"] = fake.release
     return app
@@ -82,7 +85,29 @@ def test_stream_delivers_events_then_end(app):
         "final",
     ]
     assert events[-1]["answer"] == "完成"
+    assert events[2]["observation"] == "done"
+    assert events[2]["is_error"] is False
     assert "event: end" in body
+    assert resp.headers["Cache-Control"] == "no-cache"
+    assert resp.headers["X-Accel-Buffering"] == "no-cache"
+
+
+def test_stream_idle_timeout_derives_from_settings():
+    """空闲超时必须盖过一次合法 LLM 调用的最长静默（2 倍 + 余量），不许魔法数裸放。"""
+    assert _stream_idle_timeout(Settings(llm_timeout_seconds=30)) == 120.0
+    defaults = Settings()
+    assert _stream_idle_timeout(defaults) == defaults.llm_timeout_seconds * 2 + 60
+
+
+def test_stream_emits_timeout_end_when_run_silent(monkeypatch):
+    """长静默超时路径：q.get 超时后发 end 终结事件，流不悬挂。"""
+    monkeypatch.setattr("sluice.web.app._stream_idle_timeout", lambda settings: 0.05)
+    app = create_app(runtime=ReActRuntime(SlowFakeClient(), ToolRegistry()), skills_dir=None)
+    app.config["TESTING"] = True
+    run_id = app.test_client().post("/api/chat", json={"message": "hi"}).get_json()["run_id"]
+    resp = app.test_client().get(f"/api/stream/{run_id}")
+    body = resp.get_data(as_text=True)
+    assert 'event: end\ndata: {"type": "timeout"}' in body
 
 
 def test_skills_endpoint_lists_packages():

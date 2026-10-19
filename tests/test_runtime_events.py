@@ -4,6 +4,8 @@
 避免重复定义。事件契约见 sluice/runtime/loop.py 模块注释。
 """
 
+import threading
+
 import pytest
 
 from sluice.exceptions import RoundsExhaustedError
@@ -102,3 +104,63 @@ def test_unknown_tool_observation_event_is_error():
     assert obs_events[0]["name"] == "no_such_tool"
     assert obs_events[0]["is_error"] is True
     assert "未知工具" in obs_events[0]["observation"]
+
+
+def test_concurrent_runs_do_not_cross_write_trace():
+    """共享 runtime 并发 run：trace 局部累积、结束原子赋值，互不串写。
+
+    编排：甲线程两轮（工具→最终），第二轮 chat 挂起；乙线程的 run 在甲
+    round1 已记录后才启动。旧实现（run 开头 self.trace=[]）会把甲的
+    round1 抹掉，甲的快照只剩 round2；新实现局部累积不受影响。
+    """
+    for _ in range(5):
+        _run_choreo_once()
+
+
+def _run_choreo_once():
+    ev = {k: threading.Event() for k in ("a1", "a_in2", "a2", "b_in", "b")}
+
+    class ChoreoClient:
+        def chat(self, messages, system=None, tools=None):
+            text = messages[0].content[0].text
+            if text == "问题甲":
+                if len(messages) == 1:  # 第一轮
+                    ev["a1"].wait(timeout=5)
+                    return resp_tool("甲思考", "tu_1", "echo", {"text": "x"})
+                ev["a_in2"].set()
+                ev["a2"].wait(timeout=5)
+                return resp_text("甲")
+            ev["b_in"].set()  # run 已启动（旧实现此处已清 self.trace）
+            ev["b"].wait(timeout=5)
+            return resp_text("乙")
+
+    rt = ReActRuntime(ChoreoClient(), make_registry(), max_rounds=3)
+    results = {}
+
+    def run_a():
+        ans = rt.run("问题甲")
+        results["甲"] = (ans, [dict(r) for r in rt.trace])
+
+    def run_b():
+        ans = rt.run("问题乙")
+        results["乙"] = (ans, [dict(r) for r in rt.trace])
+
+    ta = threading.Thread(target=run_a)
+    ta.start()
+    ev["a1"].set()
+    assert ev["a_in2"].wait(timeout=5)  # 甲 round1 已记录、正挂第二轮
+    tb = threading.Thread(target=run_b)
+    tb.start()
+    assert ev["b_in"].wait(timeout=5)  # 乙 run 已启动
+    ev["a2"].set()
+    ta.join()
+    ev["b"].set()
+    tb.join()
+
+    ans_a, snap_a = results["甲"]
+    ans_b, snap_b = results["乙"]
+    assert ans_a == "甲" and ans_b == "乙"
+    assert [r["round"] for r in snap_a] == [1, 2]  # 旧实现此处只剩 [2]
+    assert snap_a[1]["thought"] == "甲"
+    assert len(snap_b) == 1 and snap_b[0]["thought"] == "乙"
+    assert rt.trace[0]["thought"] == "乙"  # last-writer-wins，trace 仍可用
