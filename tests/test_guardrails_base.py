@@ -1,4 +1,5 @@
 """tests/test_guardrails_base.py"""
+
 import json
 
 from sluice.guardrails.base import AuditLog, guardrail_event
