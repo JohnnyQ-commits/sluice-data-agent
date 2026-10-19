@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     react_token_budget: int = 200_000
     audit_dir: str = "audit"
 
+    # Evals（P3）
+    eval_judge_threshold: float = 3.5  # LLM-as-judge 均分门限，T7 接线
+
     # Web / 数据
     demo_db_path: str = "data/demo.db"
 

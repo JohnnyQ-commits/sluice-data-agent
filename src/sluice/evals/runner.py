@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..config.settings import Settings
-from ..exceptions import SluiceError
+from ..exceptions import BudgetExceededError, RoundsExhaustedError, SluiceError
 from ..guardrails.chain import GuardrailChain
 from ..llm.types import LLMResponse, Message, TextBlock, ToolUseBlock
 from ..runtime.loop import ReActRuntime
@@ -187,8 +187,27 @@ class OutcomeRunner:
         events: list[dict] = []
         try:
             answer = rt.run(case.input, on_event=events.append)
-        except SluiceError as exc:  # 轮次耗尽/超预算 = 产出失败（这层是 fail 不是 error）
-            return CaseResult(case.skill, case.name, case.layer, "fail", {"error": str(exc)})
+        except (RoundsExhaustedError, BudgetExceededError) as exc:
+            # 轮次耗尽/超预算 = 产出失败（fail 不是 error），记入产出质量
+            return CaseResult(
+                case.skill, case.name, case.layer, "fail", {"error": f"{type(exc).__name__}: {exc}"}
+            )
+        except SluiceError as exc:  # 网关故障（超时/连接/HTTP）= 评测引擎故障，不冒充质量问题
+            return CaseResult(
+                case.skill,
+                case.name,
+                case.layer,
+                "error",
+                {"error": f"{type(exc).__name__}: {exc}"},
+            )
+        except Exception as exc:  # noqa: BLE001 — 坏用例兜底：单个用例归 error，不炸整批评测
+            return CaseResult(
+                case.skill,
+                case.name,
+                case.layer,
+                "error",
+                {"error": f"{type(exc).__name__}: {exc}"},
+            )
         missing = [s for s in case.must_contain if s not in answer]
         detail: dict = {"missing": missing, "answer_head": answer[:200]}
         if case.judge_rubric and self._judge_client is not None:
@@ -200,6 +219,8 @@ class OutcomeRunner:
             detail["judge_items"] = items
             detail["judge_avg"] = avg
             detail["judge_valid"] = bool(valid_scores)
+            # judge 全无效分（防作弊判定全挂）→ 有意不产生 fail，降级为纯确定性断言
+            # （must_contain 满足即 pass），与 EvalReport.judge_avg 防御口径一致，宁缺不错
             if avg is not None and avg < self._settings.eval_judge_threshold:
                 missing = missing or [
                     f"judge 均分 {avg:.2f} < {self._settings.eval_judge_threshold}"

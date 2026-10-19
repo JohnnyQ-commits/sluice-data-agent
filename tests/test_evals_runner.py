@@ -1,5 +1,6 @@
 """评测执行器测试：② behavior 层（单轮行为）+ ③ guardrail 层（确定性，零 LLM 成本）。"""
 
+from pathlib import Path
 from typing import ClassVar
 
 import pytest
@@ -15,6 +16,7 @@ from sluice.evals.runner import (
     ScriptExhaustedError,
     _response_from_spec,
 )
+from sluice.exceptions import LLMTimeoutError
 from sluice.guardrails.chain import GuardrailChain
 from sluice.llm.types import LLMResponse, TextBlock, ToolUseBlock
 from sluice.skills.loader import SkillPackage
@@ -184,7 +186,7 @@ def test_behavior_runner_chat_exception_is_error():
 
 
 def _package():
-    return SkillPackage(name="alpha", description="demo", path=None, output_contract=["指标"])
+    return SkillPackage(name="alpha", description="demo", path=Path("."), output_contract=["指标"])
 
 
 def test_outcome_runner_pass_with_sections(tmp_path):
@@ -250,6 +252,7 @@ def test_outcome_runner_output_gate_repair_path(tmp_path):
         case, _package(), _registry()
     )
     assert result.status == "pass"  # 修复稿复检通过，评测不关心中间拦截
+    assert result.detail["answer_head"].startswith("## 指标")  # 交付的是修复稿而非原稿
 
 
 def test_outcome_runner_rounds_exhausted_is_fail(tmp_path):
@@ -266,3 +269,18 @@ def test_outcome_runner_rounds_exhausted_is_fail(tmp_path):
         case, _package(), _registry()
     )
     assert result.status == "fail" and "ReAct 循环超过" in result.detail["error"]
+
+
+def test_outcome_runner_gateway_error_is_error(tmp_path):
+    """网关故障（LLMTimeoutError 等非轮次 SluiceError）→ error，不冒充产出质量 fail 污染 pass_rate。"""
+
+    class TimeoutClient:
+        def chat(self, messages, system=None, tools=None):
+            raise LLMTimeoutError("重试耗尽")
+
+    case = _case(layer="outcome", input="出报表", must_contain=["指标"])
+    result = OutcomeRunner(Settings(audit_dir=str(tmp_path / "a")), TimeoutClient()).run_case(
+        case, _package(), _registry()
+    )
+    assert result.status == "error"
+    assert result.detail["error"].startswith("LLMTimeoutError: ")
