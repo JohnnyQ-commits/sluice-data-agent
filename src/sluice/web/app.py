@@ -21,8 +21,8 @@ _FRONTEND_DIST = Path(__file__).resolve().parents[3] / "web" / "frontend" / "dis
 
 
 def _stream_idle_timeout(settings: Settings) -> float:
-    """SSE 空闲超时：盖过一次合法 LLM 调用的最长静默（2 倍 + 余量），不误杀健康长轮次。"""
-    return settings.llm_timeout_seconds * 2 + 60
+    """SSE 空闲超时：盖过 LLM 客户端重试链的最坏静默（(重试数+1)×超时 + 余量），不误杀健康长轮次。"""
+    return (settings.llm_max_retries + 1) * settings.llm_timeout_seconds + 60
 
 
 def create_app(client=None, registry=None, runtime=None, skills_dir="skills") -> Flask:

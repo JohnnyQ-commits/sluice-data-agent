@@ -93,10 +93,11 @@ def test_stream_delivers_events_then_end(app):
 
 
 def test_stream_idle_timeout_derives_from_settings():
-    """空闲超时必须盖过一次合法 LLM 调用的最长静默（2 倍 + 余量），不许魔法数裸放。"""
-    assert _stream_idle_timeout(Settings(llm_timeout_seconds=30)) == 120.0
+    """空闲超时必须盖过 LLM 重试链的最坏静默（(重试数+1)×超时 + 余量），不许魔法数裸放。"""
+    assert _stream_idle_timeout(Settings(llm_timeout_seconds=30)) == 180.0
     defaults = Settings()
-    assert _stream_idle_timeout(defaults) == defaults.llm_timeout_seconds * 2 + 60
+    expected = (defaults.llm_max_retries + 1) * defaults.llm_timeout_seconds + 60
+    assert _stream_idle_timeout(defaults) == expected
 
 
 def test_stream_emits_timeout_end_when_run_silent(monkeypatch):
