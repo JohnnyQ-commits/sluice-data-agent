@@ -33,6 +33,7 @@ def create_app(client=None, registry=None, runtime=None, skills_dir="skills") ->
         registry = ToolRegistry()
         registry.register(QueryDataTool(settings.demo_db_path))
     packages = SkillLoader().load(skills_dir, registry) if skills_dir else []
+    app.config["SLUICE_SKILLS"] = packages  # CLI 横幅等外部取清单用，避免二次 load
     runtime = runtime or ReActRuntime(
         client,
         registry,
