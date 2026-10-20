@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-20 14:27:24",
-  "pass_rate": 0.8889,
+  "generated_at": "2026-10-20 19:19:01",
+  "pass_rate": 1.0,
   "judge_avg": null,
   "results": [
     {
@@ -10,30 +10,31 @@
       "status": "pass",
       "detail": {
         "missing": [],
-        "answer_head": "信贷业务周报已生成完毕。核心信息如下：\n\n**统计周期**：2026-10-12 ~ 2026-10-18（上周自然周，基于数据最新日期 2026-10-21 推算）\n\n**核心指标**\n\n| 指标 | 本周 | 环比变化 |\n|---|---|---|\n| 贷款申请量 | 153 件 | +15%（上上周 133 件） |\n| 审批通过率 | 66.01% | -4.7pct（上上周 70.68",
+        "answer_head": "上周的信贷业务周报已生成完毕，内容如下：\n\n---\n\n# 信贷业务周报\n\n**统计周期**：2026-10-12 ~ 2026-10-18（环比：2026-10-05 ~ 2026-10-11）\n\n## 核心指标\n\n- **贷款申请量**：153 件（环比 +15%）\n- **审批通过率**：66.01%（环比 -4.67pp）\n- **件均申请金额**：30.90 万元（环比 +23.2%）\n\n",
         "judge_items": [
           {
             "item": "数值必须与 demo 库 credit_applications 表真实聚合一致（申请量/通过率/件均），不得编造",
             "score": null,
-            "quote": "贷款申请量 | 153 件 | +15%（上上周 133 件）……审批通过率 | 66.01% | -4.7pct（上上周 70.68%）……主要由消费贷（57 件）和经营贷（55 件）驱动……北京申请量居首（32 件）；广州通过率最高（74.2%）",
+            "quote": "",
             "valid": false
           },
           {
             "item": "通过率保留 1 位小数百分比；件均金额保留 2 位小数",
             "score": null,
-            "quote": "审批通过率 | 66.01% | -4.7pct（上上周 70.68%）……件均申请金额 | 30.90 万元",
+            "quote": "",
             "valid": false
           },
           {
             "item": "统计周期为自然周（周一~周日），禁止用 MAX(app_date) 锚点；覆盖不足时注明",
             "score": null,
-            "quote": "统计周期：2026-10-12 ~ 2026-10-18（上周自然周，基于数据最新日期 2026-10-21 推算）",
+            "quote": "",
             "valid": false
           }
         ],
         "judge_avg": null,
         "judge_valid": false
-      }
+      },
+      "known_issue": false
     },
     {
       "skill": "credit-weekly",
@@ -42,11 +43,11 @@
       "status": "pass",
       "detail": {
         "used_tools": [
-          "credit-weekly.query_credit",
           "credit-weekly.query_credit"
         ],
         "expect_skill": "credit-weekly"
-      }
+      },
+      "known_issue": false
     },
     {
       "skill": "credit-weekly",
@@ -66,7 +67,8 @@
             "action": "blocked"
           }
         ]
-      }
+      },
+      "known_issue": false
     },
     {
       "skill": "weekly-report",
@@ -75,7 +77,7 @@
       "status": "pass",
       "detail": {
         "missing": [],
-        "answer_head": "# 销售数据周报\n\n**统计周期**：2026-10-12 ~ 2026-10-18（按自然周口径，环比基期为 10-05 ~ 10-11）\n\n## 核心指标\n\n| 指标 | 本周 | 环比 |\n|---|---|---|\n| GMV（元） | 201,297.77 | +32.7% |\n| 订单量 | 359 | -0.6% |\n| 客单价（元） | 560.72 | +33.4% |\n| 覆盖",
+        "answer_head": "上周的数据周报已生成完毕：\n\n# 销售数据周报\n\n**统计周期**：2026-10-12 ~ 2026-10-18\n\n## 核心指标\n\n| 指标 | 本周 | 环比 |\n|---|---|---|\n| 销售额（元） | 201,297.77 | +32.7% |\n| 订单量（单） | 359 | -0.6% |\n| 客单价（元/单） | 560.6 | +33.4% |\n| 第一大品类 | 服饰（",
         "judge_items": [
           {
             "item": "数值必须与 demo 库 sales 表真实聚合一致，不得编造",
@@ -98,19 +100,22 @@
         ],
         "judge_avg": null,
         "judge_valid": false
-      }
+      },
+      "known_issue": false
     },
     {
       "skill": "weekly-report",
       "case": "weekly_intent_route",
       "layer": "behavior",
-      "status": "fail",
+      "status": "pass",
       "detail": {
         "used_tools": [
-          "query_data"
+          "weekly-report.query_sales",
+          "weekly-report.query_sales"
         ],
         "expect_skill": "weekly-report"
-      }
+      },
+      "known_issue": false
     },
     {
       "skill": "weekly-report",
@@ -120,7 +125,8 @@
       "detail": {
         "used_tools": [],
         "expect_skill": ""
-      }
+      },
+      "known_issue": false
     },
     {
       "skill": "weekly-report",
@@ -140,7 +146,8 @@
             "action": "blocked"
           }
         ]
-      }
+      },
+      "known_issue": false
     },
     {
       "skill": "weekly-report",
@@ -160,7 +167,8 @@
             "action": "blocked"
           }
         ]
-      }
+      },
+      "known_issue": false
     },
     {
       "skill": "weekly-report",
@@ -180,7 +188,8 @@
             "action": "blocked"
           }
         ]
-      }
+      },
+      "known_issue": false
     }
   ]
 }
