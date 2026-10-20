@@ -17,6 +17,15 @@ def test_build_system_with_packages_contains_prefix_steering():
     assert "带前缀工具" in text
     assert "裸工具" in text
     assert "不携带" in text and "产出契约" in text
+    assert "说明文件明确指示使用某个内置工具，以其说明为准" in text
+
+
+def test_build_system_steering_no_hardcoded_tool_names():
+    """引导句不得硬编码具体 Skill/工具名——平台代码与具体 skill 解耦。"""
+    text = build_system([_pkg("weekly-report"), _pkg("credit-weekly")])
+    assert "query_data" not in text
+    assert "query_credit" not in text
+    assert "render_report" not in text
 
 
 def test_build_system_without_packages_no_steering():

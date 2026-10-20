@@ -15,9 +15,9 @@ def build_system(packages: list[SkillPackage]) -> str:
         base += (
             "\n\n可用的 Skill（通过其带前缀的工具使用）：\n"
             + lines
-            + "\n属于某个 Skill 职责的任务，必须调用该 Skill 的带前缀工具"
-            "（如 credit-weekly.query_credit、weekly-report.render_report），"
-            "不要用平台内置的裸工具（如 query_data）替代——裸工具不携带 Skill 的产出契约，"
+            + "\n属于某个 Skill 职责的任务，必须调用该 Skill 的带前缀工具，"
+            "不要用平台内置的裸工具替代——裸工具不携带 Skill 的产出契约，"
             "输出门禁无法据此校验交付物，Skill 的统计口径约束也会落空。"
+            "若该 Skill 的说明文件明确指示使用某个内置工具，以其说明为准。"
         )
     return base
