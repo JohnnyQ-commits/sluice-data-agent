@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 
 from ..llm.types import ToolUseBlock
 
@@ -27,27 +28,30 @@ class BehaviorGate:
         self._tokens_used = 0
         self._prev_keys: set[str] = set()
         self._round_keys: set[str] = set()
+        self._lock = threading.Lock()
 
     def check_call(self, tu: ToolUseBlock) -> str | None:
         """工具执行前调用。返回 None 放行（并登记当轮指纹），返回打断原因（回喂模型）。"""
-        key = call_key(tu)
-        if key in self._round_keys:
-            return (
-                f"检测到同一轮内完全相同的重复调用 {tu.name}，已强制打断："
-                "一次工具调用即可，请不要在同一条消息里重复发起"
-            )
-        if key in self._prev_keys:
-            return (
-                f"检测到与上一轮完全相同的重复调用 {tu.name}，已强制打断："
-                "请换一种方法推进，或直接给出最终回答"
-            )
-        self._round_keys.add(key)
-        return None
+        with self._lock:
+            key = call_key(tu)
+            if key in self._round_keys:
+                return (
+                    f"检测到同一轮内完全相同的重复调用 {tu.name}，已强制打断："
+                    "一次工具调用即可，请不要在同一条消息里重复发起"
+                )
+            if key in self._prev_keys:
+                return (
+                    f"检测到与上一轮完全相同的重复调用 {tu.name}，已强制打断："
+                    "请换一种方法推进，或直接给出最终回答"
+                )
+            self._round_keys.add(key)
+            return None
 
     def commit_round(self, tool_uses: list[ToolUseBlock]) -> None:
         """每轮末轮转比对基准：本轮全部指纹（含被拦的）成为下一轮基准，当轮登记清空。"""
-        self._prev_keys = {call_key(tu) for tu in tool_uses}
-        self._round_keys = set()
+        with self._lock:
+            self._prev_keys = {call_key(tu) for tu in tool_uses}
+            self._round_keys = set()
 
     def record_usage(self, usage: dict) -> str | None:
         """每轮末累计 token；超预算返回终止原因（loop 据此抛 BudgetExceededError）。"""

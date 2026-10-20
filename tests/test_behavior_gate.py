@@ -112,3 +112,59 @@ def test_ab_a_pattern_still_allowed():
     assert gate.check_call(b) is None
     gate.commit_round([b])
     assert gate.check_call(a) is None
+
+
+def test_concurrent_check_call_thread_safe():
+    """并发 check_call 不串状态：线程安全是并发工具执行的前置（P4 红线）。
+
+    注：check_call 既有语义是同轮内重复调用即拦，同一线程重复发同一 tu 第 2 次起
+    本就该被拦（非并发缺陷）——故每次迭代用唯一指纹，保证 200x2 次互不命中全部放行。
+    """
+    import threading
+
+    gate = BehaviorGate(token_budget=0)
+    blocked: list[bool] = []
+    errors: list[Exception] = []
+
+    def _worker(i: int):
+        try:
+            for j in range(200):
+                tu = ToolUseBlock(f"t{i}-{j}", "demo.report", {"text": f"{i}-{j}"})
+                blocked.append(gate.check_call(tu) is not None)
+        except Exception as e:  # noqa: BLE001 — 测试需捕获线程内任意异常
+            errors.append(e)
+
+    threads = [threading.Thread(target=_worker, args=(i,)) for i in range(2)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert not errors
+    # 唯一指纹互不命中：200x2 次全部放行；若锁缺失导致集合读写撕裂会抛异常而非静默错
+    assert not any(blocked)
+
+
+def test_concurrent_check_call_and_commit_round_no_error():
+    """check_call 与 commit_round 并发穿插：唯一指纹互不命中，全程无异常、无拦截。"""
+    import threading
+
+    gate = BehaviorGate(token_budget=0)
+    errors: list[Exception] = []
+    blocked: list[bool] = []
+
+    def _worker(i: int):
+        try:
+            for j in range(100):
+                tu = ToolUseBlock(f"id{i}-{j}", "demo.report", {"i": i, "j": j})
+                blocked.append(gate.check_call(tu) is not None)
+                gate.commit_round([ToolUseBlock(f"c{i}-{j}", "demo.report", {"i": i})])
+        except Exception as e:  # noqa: BLE001 — 测试需捕获线程内任意异常
+            errors.append(e)
+
+    threads = [threading.Thread(target=_worker, args=(i,)) for i in range(2)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert not errors
+    assert not any(blocked)

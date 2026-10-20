@@ -8,3 +8,5 @@ __pycache__/
 data/*.db
 audit/
 evals/reports/
+.idea/
+web_server*.log
