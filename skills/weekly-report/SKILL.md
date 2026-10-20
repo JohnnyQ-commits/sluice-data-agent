@@ -19,3 +19,4 @@ output_contract: 核心指标;重点发现
 2. 至少查询：本周总销售额、上周总销售额、环比；分品类汇总；Top 城市。
 3. 把算好的指标交给 `weekly-report.render_report` 渲染。
 4. 最终回答 = 渲染出的 markdown 周报全文。
+5. **禁止**查询 `sqlite_master` / `PRAGMA` 等内省入口（表名门禁会拦截，浪费一轮自纠）——表结构以本文件声明为准：`sales`（sale_date / city / category / amount）。

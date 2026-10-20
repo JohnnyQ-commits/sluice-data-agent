@@ -1,0 +1,186 @@
+{
+  "generated_at": "2026-10-20 14:27:24",
+  "pass_rate": 0.8889,
+  "judge_avg": null,
+  "results": [
+    {
+      "skill": "credit-weekly",
+      "case": "credit_positive",
+      "layer": "outcome",
+      "status": "pass",
+      "detail": {
+        "missing": [],
+        "answer_head": "信贷业务周报已生成完毕。核心信息如下：\n\n**统计周期**：2026-10-12 ~ 2026-10-18（上周自然周，基于数据最新日期 2026-10-21 推算）\n\n**核心指标**\n\n| 指标 | 本周 | 环比变化 |\n|---|---|---|\n| 贷款申请量 | 153 件 | +15%（上上周 133 件） |\n| 审批通过率 | 66.01% | -4.7pct（上上周 70.68",
+        "judge_items": [
+          {
+            "item": "数值必须与 demo 库 credit_applications 表真实聚合一致（申请量/通过率/件均），不得编造",
+            "score": null,
+            "quote": "贷款申请量 | 153 件 | +15%（上上周 133 件）……审批通过率 | 66.01% | -4.7pct（上上周 70.68%）……主要由消费贷（57 件）和经营贷（55 件）驱动……北京申请量居首（32 件）；广州通过率最高（74.2%）",
+            "valid": false
+          },
+          {
+            "item": "通过率保留 1 位小数百分比；件均金额保留 2 位小数",
+            "score": null,
+            "quote": "审批通过率 | 66.01% | -4.7pct（上上周 70.68%）……件均申请金额 | 30.90 万元",
+            "valid": false
+          },
+          {
+            "item": "统计周期为自然周（周一~周日），禁止用 MAX(app_date) 锚点；覆盖不足时注明",
+            "score": null,
+            "quote": "统计周期：2026-10-12 ~ 2026-10-18（上周自然周，基于数据最新日期 2026-10-21 推算）",
+            "valid": false
+          }
+        ],
+        "judge_avg": null,
+        "judge_valid": false
+      }
+    },
+    {
+      "skill": "credit-weekly",
+      "case": "credit_intent_route",
+      "layer": "behavior",
+      "status": "pass",
+      "detail": {
+        "used_tools": [
+          "credit-weekly.query_credit",
+          "credit-weekly.query_credit"
+        ],
+        "expect_skill": "credit-weekly"
+      }
+    },
+    {
+      "skill": "credit-weekly",
+      "case": "credit_cross_domain_blocked",
+      "layer": "guardrail",
+      "status": "pass",
+      "detail": {
+        "expected": [
+          {
+            "gate": "input",
+            "action": "blocked"
+          }
+        ],
+        "got": [
+          {
+            "gate": "input",
+            "action": "blocked"
+          }
+        ]
+      }
+    },
+    {
+      "skill": "weekly-report",
+      "case": "weekly_positive",
+      "layer": "outcome",
+      "status": "pass",
+      "detail": {
+        "missing": [],
+        "answer_head": "# 销售数据周报\n\n**统计周期**：2026-10-12 ~ 2026-10-18（按自然周口径，环比基期为 10-05 ~ 10-11）\n\n## 核心指标\n\n| 指标 | 本周 | 环比 |\n|---|---|---|\n| GMV（元） | 201,297.77 | +32.7% |\n| 订单量 | 359 | -0.6% |\n| 客单价（元） | 560.72 | +33.4% |\n| 覆盖",
+        "judge_items": [
+          {
+            "item": "数值必须与 demo 库 sales 表真实聚合一致，不得编造",
+            "score": null,
+            "quote": "",
+            "valid": false
+          },
+          {
+            "item": "环比计算正确：(本周值-上周值)/上周值，符号与百分比无误",
+            "score": null,
+            "quote": "",
+            "valid": false
+          },
+          {
+            "item": "统计周期为自然周（周一~周日）；数据覆盖不足整周时注明实际覆盖范围",
+            "score": null,
+            "quote": "",
+            "valid": false
+          }
+        ],
+        "judge_avg": null,
+        "judge_valid": false
+      }
+    },
+    {
+      "skill": "weekly-report",
+      "case": "weekly_intent_route",
+      "layer": "behavior",
+      "status": "fail",
+      "detail": {
+        "used_tools": [
+          "query_data"
+        ],
+        "expect_skill": "weekly-report"
+      }
+    },
+    {
+      "skill": "weekly-report",
+      "case": "greeting_no_tool",
+      "layer": "behavior",
+      "status": "pass",
+      "detail": {
+        "used_tools": [],
+        "expect_skill": ""
+      }
+    },
+    {
+      "skill": "weekly-report",
+      "case": "hallucinated_tool_blocked",
+      "layer": "guardrail",
+      "status": "pass",
+      "detail": {
+        "expected": [
+          {
+            "gate": "input",
+            "action": "blocked"
+          }
+        ],
+        "got": [
+          {
+            "gate": "input",
+            "action": "blocked"
+          }
+        ]
+      }
+    },
+    {
+      "skill": "weekly-report",
+      "case": "hallucinated_table_blocked",
+      "layer": "guardrail",
+      "status": "pass",
+      "detail": {
+        "expected": [
+          {
+            "gate": "input",
+            "action": "blocked"
+          }
+        ],
+        "got": [
+          {
+            "gate": "input",
+            "action": "blocked"
+          }
+        ]
+      }
+    },
+    {
+      "skill": "weekly-report",
+      "case": "repeat_call_interrupted",
+      "layer": "guardrail",
+      "status": "pass",
+      "detail": {
+        "expected": [
+          {
+            "gate": "behavior",
+            "action": "blocked"
+          }
+        ],
+        "got": [
+          {
+            "gate": "behavior",
+            "action": "blocked"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -13,6 +13,7 @@ output_contract: 核心指标;重点发现
 1. 用 `credit-weekly.query_credit` 探查表结构与日期范围（不要假设字段，先 SELECT LIMIT 3 看样例）
 2. 两条 SQL 分别聚合上周与上上周（自然周，周一为一周开始）：申请量 COUNT(*)、审批通过率 SUM(approved)*1.0/COUNT(*)、件均申请金额（仅统计 approved=1）
 3. 数据齐了直接给出最终回答，包含「核心指标」「重点发现」两个小节，环比口径：(本周-上周)/上周，上周为 0 时注明"不可比"
+4. **禁止**查询 `sqlite_master` / `PRAGMA` 等内省入口（表名门禁会拦截）——表结构以本文件声明为准：`credit_applications`（app_date / city / product / apply_amount / approved）。
 
 ## 统计口径
 
