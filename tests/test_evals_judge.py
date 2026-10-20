@@ -125,3 +125,17 @@ def test_echo_fallback_not_applied_on_length_mismatch():
     reply = '{"items": [{"item": "乱写", "score": 5, "quote": "环比 +15%"}]}'
     items = judge_output(StubJudge(reply), ANSWER, ["数值一致", "口径正确"])
     assert all(i["valid"] is False for i in items)
+
+
+def test_echo_fallback_does_not_bypass_quote_gate():
+    """组合钉子：回退路由接受改写维度名后，编造 quote 仍被 containment 主闸拦下。"""
+    reply = '{"items": [{"item": "维度一：数值是否一致", "score": 5, "quote": "编造的引用"}]}'
+    items = judge_output(StubJudge(reply), ANSWER, ["数值一致"])
+    assert items[0]["valid"] is False and items[0]["score"] is None
+
+
+def test_quote_trailing_ellipsis_still_valid():
+    """组合钉子：judge 截断长引用的尾省略形态（"A……"）→ 单段全含即有效。"""
+    reply = '{"items": [{"item": "数值一致", "score": 5, "quote": "上周销售额 123.45 万元……"}]}'
+    items = judge_output(StubJudge(reply), ANSWER, ["数值一致"])
+    assert items[0]["valid"] is True and items[0]["score"] == 5

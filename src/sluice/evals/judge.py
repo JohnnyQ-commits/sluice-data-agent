@@ -46,13 +46,15 @@ def _echo_key(echoed: str) -> str:
 
 
 def _quote_covers(quote_norm: str, answer_norm: str) -> bool:
-    """quote 归一化后是否被产出包含；含省略号（……/...）时按省略号分段，要求每段全含。"""
+    """quote 归一化后是否被产出包含；含省略号（……/...）时按省略号分段，要求每段全含。
+
+    分段不校验顺序（"B……A" 各自出现即过）；含省略号时短段只需独立出现于产出——
+    宽容方向是本意，防编造主闸仍是"每段都必须真实存在"。
+    """
     if not quote_norm:
         return False
-    segments = [s for s in re.split(r"…+|\.{3,}", quote_norm) if s]
-    if len(segments) <= 1:
-        return quote_norm in answer_norm
-    return all(s in answer_norm for s in segments)
+    segs = [s for s in re.split(r"…+|\.{3,}", quote_norm) if s]
+    return bool(segs) and all(s in answer_norm for s in segs)
 
 
 def judge_output(client, answer: str, rubric: list[str]) -> list[dict]:
@@ -93,6 +95,8 @@ def judge_output(client, answer: str, rubric: list[str]) -> list[dict]:
         and all(isinstance(it, dict) for it in items_raw)
         and all(_echo_key(str(it.get("item", ""))) for it in items_raw)
     ):
+        # 注：rubric 含重复维度名时 {rubric[i]: items_raw[i]} 后位覆盖前位，会静默吞分——
+        # 已知限制，重复维度名在 rubric 侧禁掉即可（echo 路由同样按名去重）。
         by_item = {rubric[i]: items_raw[i] for i in range(len(rubric))}
     answer_norm = _normalize(answer)
     results = []
