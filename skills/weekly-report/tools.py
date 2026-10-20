@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from sluice.tools.base import Tool, ToolResult
+
+if TYPE_CHECKING:
+    from sluice.tools.query_data import QueryDataTool
 
 
 class RenderReportTool(Tool):
@@ -66,4 +69,41 @@ class RenderReportTool(Tool):
         return ToolResult("\n".join(lines))
 
 
-TOOLS: list = [RenderReportTool()]
+class QuerySalesTool(Tool):
+    """Skill 前缀查询工具：P4 修复 intent_route 结构性 fail——skill 查数不再依赖平台裸 query_data。"""
+
+    name: ClassVar[str] = "query_sales"
+    description: ClassVar[str] = (
+        "在 demo 库执行只读 SQL（表 sales），返回行文本。查数一律用本工具，不要用平台裸工具。"
+    )
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {"sql": {"type": "string", "description": "只读 SELECT 语句"}},
+        "required": ["sql"],
+    }
+
+    def __init__(self, db_path: str | None = None):
+        self._db_path = db_path  # None = 运行时取平台 demo 库（生产路径）
+        self._kernel: QueryDataTool | None = None  # 惰性创建，避免 loader 加载阶段依赖平台工具
+
+    def _kernel_tool(self) -> QueryDataTool:
+        if self._kernel is None:
+            from sluice.config.settings import Settings
+            from sluice.tools.query_data import QueryDataTool
+
+            db_path = self._db_path or Settings().demo_db_path
+            self._kernel = QueryDataTool(db_path)
+        return self._kernel
+
+    def table_allowlist(self) -> list[str]:
+        """转发内核的表名白名单——幻觉表门禁对前缀工具同样生效，不能哑火。"""
+        return self._kernel_tool().table_allowlist()
+
+    def execute(self, args: dict[str, Any]) -> ToolResult:
+        sql = args.get("sql")
+        if not isinstance(sql, str) or not sql.strip():
+            return ToolResult("sql 必须是非空字符串", is_error=True)
+        return self._kernel_tool().execute({"sql": sql})
+
+
+TOOLS: list = [RenderReportTool(), QuerySalesTool()]

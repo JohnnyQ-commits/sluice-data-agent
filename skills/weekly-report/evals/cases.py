@@ -15,9 +15,7 @@ CASES = [
             "统计周期为自然周（周一~周日）；数据覆盖不足整周时注明实际覆盖范围",
         ],
     },
-    # 结构性已知 fail：SKILL.md 流程指示用内置裸 query_data 查数，而 behavior 判定语义
-    # 只认带前缀工具——基线如实记录此矛盾，产品修复留 P4（skill 配前缀查询工具或放宽
-    # 判定），勿当回归。
+    # 结构性 fail 已于 P4 修复（skill 配前缀查询工具 query_sales），expect 不变，重建基线后预期 pass。
     {
         "name": "weekly_intent_route",
         "layer": "behavior",
@@ -37,7 +35,7 @@ CASES = [
         "script": [
             {"tool": "ghost_tool", "args": {}},
             {
-                "tool": "query_data",
+                "tool": "weekly-report.query_sales",
                 "args": {
                     "sql": "SELECT city, SUM(amount) AS total FROM sales"
                     " GROUP BY city ORDER BY total DESC LIMIT 1"
@@ -52,7 +50,7 @@ CASES = [
         "layer": "guardrail",
         "input": "出一份 demo 报告",
         "script": [
-            {"tool": "query_data", "args": {"sql": "SELECT * FROM daily_metrics"}},
+            {"tool": "weekly-report.query_sales", "args": {"sql": "SELECT * FROM daily_metrics"}},
             {"text": "改用真实表了"},
         ],
         "expect_guardrails": [{"gate": "input", "action": "blocked"}],
@@ -62,8 +60,14 @@ CASES = [
         "layer": "guardrail",
         "input": "出一份 demo 报告",
         "script": [
-            {"tool": "query_data", "args": {"sql": "SELECT COUNT(*) AS n FROM sales"}},
-            {"tool": "query_data", "args": {"sql": "SELECT COUNT(*) AS n FROM sales"}},
+            {
+                "tool": "weekly-report.query_sales",
+                "args": {"sql": "SELECT COUNT(*) AS n FROM sales"},
+            },
+            {
+                "tool": "weekly-report.query_sales",
+                "args": {"sql": "SELECT COUNT(*) AS n FROM sales"},
+            },
             {"text": "## 核心指标\n数据 1060 条\n## 重点发现\n数据完整"},
         ],
         "expect_guardrails": [{"gate": "behavior", "action": "blocked"}],

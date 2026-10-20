@@ -17,6 +17,41 @@ def test_skill_package_loads_with_prefixed_tools():
     names = [p.name for p in SkillLoader().load(SKILLS_DIR, ToolRegistry())]
     assert "weekly-report" in names
     assert registry.get("weekly-report.render_report") is not None
+    assert registry.get("weekly-report.query_sales") is not None
+
+
+def test_query_sales_delegates_and_rejects_non_string(tmp_path):
+    """前缀查询工具：SQL 执行委托 query_data 内核，非字符串 SQL 报错不执行（结构性 fail 修复件）。"""
+    import sqlite3
+
+    db = tmp_path / "t.db"
+    conn = sqlite3.connect(db)
+    conn.execute("CREATE TABLE sales (sale_date TEXT, city TEXT, category TEXT, amount REAL)")
+    conn.execute("INSERT INTO sales VALUES ('2026-10-13', '杭州', '食品', 100.0)")
+    conn.commit()
+    conn.close()
+
+    tool_cls = type(_load().get("weekly-report.query_sales"))
+    tool = tool_cls(str(db))
+    ok = tool.execute({"sql": "SELECT city, SUM(amount) FROM sales GROUP BY city"})
+    assert not ok.is_error and "杭州" in ok.content
+    bad = tool.execute({"sql": 123})
+    assert bad.is_error and "sql" in bad.content.lower()
+
+
+def test_query_sales_forwards_table_allowlist(tmp_path):
+    """幻觉表门禁依赖 table_allowlist：前缀工具必须转发内核白名单，否则门禁哑火。"""
+    import sqlite3
+
+    db = tmp_path / "allow.db"
+    conn = sqlite3.connect(db)
+    conn.execute("CREATE TABLE sales (sale_date TEXT, city TEXT, category TEXT, amount REAL)")
+    conn.commit()
+    conn.close()
+
+    tool_cls = type(_load().get("weekly-report.query_sales"))
+    tool = tool_cls(str(db))
+    assert tool.table_allowlist() == ["sales"]
 
 
 def test_render_report_produces_markdown():
