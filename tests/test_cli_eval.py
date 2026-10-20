@@ -165,3 +165,24 @@ def test_eval_update_baseline_writes_file(tmp_path, monkeypatch):
         cli_main.main(["eval", "--all", "--update-baseline"])
     assert ei.value.code == 0
     assert (tmp_path / "evals" / "baseline.json").is_file()
+
+
+def test_eval_judge_settings_raise_max_tokens(tmp_path, monkeypatch):
+    """judge_client 构造必须放宽 max_tokens：思考型模型 4096 全耗思考正文零输出（T5 实录）。"""
+    _patch_cli(monkeypatch, tmp_path, [_stub_pkg()])
+    monkeypatch.setenv("SLUICE_LLM_API_KEY", "sk-test")  # 有 key 才走 client/judge 构造
+    captured = []
+
+    class _CaptureClient:
+        def __init__(self, settings):
+            captured.append(settings)  # 只记录构造参数，guardrail 桩用例不会真调
+
+    monkeypatch.setattr(cli_main, "LLMClient", _CaptureClient)
+    with pytest.raises(SystemExit) as ei:
+        cli_main.main(["eval", "--all"])
+    assert ei.value.code == 0
+    # client + judge_client 两次构造；judge 是第二次：max_tokens 放宽、
+    # eval_judge_model 为空时 model 复用主配置
+    assert len(captured) == 2
+    assert captured[1].llm_max_tokens == 16384
+    assert captured[1].llm_model == captured[0].llm_model

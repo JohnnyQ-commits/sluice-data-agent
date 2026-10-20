@@ -99,10 +99,13 @@ def _eval(args: argparse.Namespace) -> None:
     judge_client = None
     if has_key and not args.skip_judge:
         judge_settings = (
-            settings.model_copy(update={"llm_model": settings.eval_judge_model})
+            settings.model_copy(
+                update={"llm_model": settings.eval_judge_model, "llm_max_tokens": 16384}
+            )
             if settings.eval_judge_model
-            else settings
+            else settings.model_copy(update={"llm_max_tokens": 16384})
         )
+        # judge 单轮纯文本，思考型模型 4096 全耗思考正文零输出（T5 实录）
         judge_client = LLMClient(judge_settings)
 
     results = run_eval(selected, packages, registry, settings, client, judge_client)
