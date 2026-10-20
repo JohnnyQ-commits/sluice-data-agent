@@ -94,3 +94,34 @@ def test_markdown_fenced_json_still_parsed():
     reply = '好的，评分如下：\n```json\n{"items": [{"item": "口径", "score": 4, "quote": "环比 +15%"}]}\n```'
     items = judge_output(StubJudge(reply), ANSWER, ["口径"])
     assert items[0]["valid"] is True and items[0]["score"] == 4
+
+
+def test_quote_with_ellipsis_segments_still_valid():
+    """judge 把长句压缩成'A……B'改写引用 → 按省略号分段全含判定（P3 实录：基线轮 judge 全无效主因）。"""
+    reply = '{"items": [{"item": "数值一致", "score": 5, "quote": "上周销售额 123.45 万元……杭州连续三周居首"}]}'
+    items = judge_output(StubJudge(reply), ANSWER, ["数值一致"])
+    assert items[0]["valid"] is True and items[0]["score"] == 5
+
+
+def test_quote_ellipsis_segment_missing_still_invalid():
+    """分段后任一段不在产出原文 → 仍无效（防作弊不放松）。"""
+    reply = '{"items": [{"item": "数值一致", "score": 5, "quote": "上周销售额……编造的结尾"}]}'
+    items = judge_output(StubJudge(reply), ANSWER, ["数值一致"])
+    assert items[0]["valid"] is False
+
+
+def test_echo_fallback_positional_match():
+    """judge 全部改写维度名但逐位对应 rubric → 按位接受（回显匹配只是路由，quote containment 仍是防编造主闸）。"""
+    reply = (
+        '{"items": [{"item": "维度一：数值是否一致", "score": 4, "quote": "环比 +15%"},'
+        ' {"item": "维度二：口径", "score": 3, "quote": "杭州连续三周居首"}]}'
+    )
+    items = judge_output(StubJudge(reply), ANSWER, ["数值一致", "口径正确"])
+    assert [i["score"] for i in items] == [4, 3] and all(i["valid"] for i in items)
+
+
+def test_echo_fallback_not_applied_on_length_mismatch():
+    """items 数与 rubric 数不等 → 不启用按位回退，维持降级。"""
+    reply = '{"items": [{"item": "乱写", "score": 5, "quote": "环比 +15%"}]}'
+    items = judge_output(StubJudge(reply), ANSWER, ["数值一致", "口径正确"])
+    assert all(i["valid"] is False for i in items)

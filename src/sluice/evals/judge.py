@@ -45,6 +45,16 @@ def _echo_key(echoed: str) -> str:
     return _normalize(_ECHO_PREFIX_RE.sub("", echoed))
 
 
+def _quote_covers(quote_norm: str, answer_norm: str) -> bool:
+    """quote 归一化后是否被产出包含；含省略号（……/...）时按省略号分段，要求每段全含。"""
+    if not quote_norm:
+        return False
+    segments = [s for s in re.split(r"…+|\.{3,}", quote_norm) if s]
+    if len(segments) <= 1:
+        return quote_norm in answer_norm
+    return all(s in answer_norm for s in segments)
+
+
 def judge_output(client, answer: str, rubric: list[str]) -> list[dict]:
     """返回 [{item, score, quote, valid}]，顺序与 rubric 一致；valid=False 时 score=None。"""
     dims = "\n".join(f"{i}. {item}" for i, item in enumerate(rubric, 1))
@@ -75,6 +85,15 @@ def judge_output(client, answer: str, rubric: list[str]) -> list[dict]:
         rubric_item = rubric_by_norm.get(_echo_key(echoed))
         if rubric_item is not None:  # 剥序号归一化后仍对不上的回显项不收
             by_item[rubric_item] = it
+    # 位置回退：judge 全部改写维度名（echo 全 miss）但逐位对应 rubric → 按位接受。
+    # 回显匹配只是路由，quote containment 仍守防编造；改写名需非空，防空壳 items 走位。
+    if (
+        not by_item
+        and len(items_raw) == len(rubric)
+        and all(isinstance(it, dict) for it in items_raw)
+        and all(_echo_key(str(it.get("item", ""))) for it in items_raw)
+    ):
+        by_item = {rubric[i]: items_raw[i] for i in range(len(rubric))}
     answer_norm = _normalize(answer)
     results = []
     for item in rubric:
@@ -85,7 +104,7 @@ def judge_output(client, answer: str, rubric: list[str]) -> list[dict]:
             score is not None
             and 1 <= score <= 5
             and bool(quote)
-            and _normalize(quote) in answer_norm
+            and _quote_covers(_normalize(quote), answer_norm)
         )
         results.append(
             {"item": item, "score": score if valid else None, "quote": quote, "valid": valid}
