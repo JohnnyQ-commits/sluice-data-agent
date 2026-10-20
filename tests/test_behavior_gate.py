@@ -140,12 +140,44 @@ def test_concurrent_check_call_thread_safe():
     for th in threads:
         th.join()
     assert not errors
-    # 唯一指纹互不命中：200x2 次全部放行；若锁缺失导致集合读写撕裂会抛异常而非静默错
+    # 唯一指纹互不命中：200x2 次全部放行
     assert not any(blocked)
 
 
+def test_concurrent_same_key_exactly_one_passes():
+    """同指纹 barrier 钉子：8 线程对同一 ToolUseBlock 并发 check_call，恰好 1 个放行。
+
+    持锁时确定性绿——锁串行化 check_call，首个放行并 claim，其余必被同轮查重拦截；
+    失锁时 TOCTOU 双放行概率性红（GIL 下 set.add/in 静默不抛异常，失锁是静默的）。
+    """
+    import threading
+
+    gate = BehaviorGate(token_budget=0)
+    n = 8
+    barrier = threading.Barrier(n)
+    results: list[str | None] = [None] * n
+
+    def _worker(i: int):
+        barrier.wait()
+        tu = ToolUseBlock(f"t{i}", "demo.report", {"text": "same"})
+        results[i] = gate.check_call(tu)
+
+    threads = [threading.Thread(target=_worker, args=(i,)) for i in range(n)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    # 同轮查重语义：恰好 1 个放行（claim 当轮指纹），其余 7 个全被"同一轮内重复"拦截
+    assert sum(r is None for r in results) == 1
+    assert all(r is not None and "同一轮内" in r for r in results if r is not None)
+
+
 def test_concurrent_check_call_and_commit_round_no_error():
-    """check_call 与 commit_round 并发穿插：唯一指纹互不命中，全程无异常、无拦截。"""
+    """check_call 与 commit_round 并发穿插：唯一指纹互不命中，全程无异常、无拦截。
+
+    防回归钉子（概率性）：GIL 下失锁是静默的，本组并发测试靠概率抓回归，
+    真正的确定性保证在 test_concurrent_same_key_exactly_one_passes。
+    """
     import threading
 
     gate = BehaviorGate(token_budget=0)

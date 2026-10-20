@@ -48,7 +48,11 @@ class BehaviorGate:
             return None
 
     def commit_round(self, tool_uses: list[ToolUseBlock]) -> None:
-        """每轮末轮转比对基准：本轮全部指纹（含被拦的）成为下一轮基准，当轮登记清空。"""
+        """每轮末轮转比对基准：本轮全部指纹（含被拦的）成为下一轮基准，当轮登记清空。
+
+        M-2：锁只保证单次调用原子，调用方须保证 commit_round 不与同轮 check_call
+        并发（当前 loop.py 顺序 for 循环保证了这点，P4 并发执行器设计须遵守）。
+        """
         with self._lock:
             self._prev_keys = {call_key(tu) for tu in tool_uses}
             self._round_keys = set()
