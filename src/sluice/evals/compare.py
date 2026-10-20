@@ -1,6 +1,7 @@
 """基线比对与门禁：与基线比 per-skill 通过率 + judge 均分，分数下降即 fail。
 
 比对只看两个报告共有 skill 的可计数结果；skipped 不进分母，
+known_issue 的 fail 同样不进分母（结构性已知缺陷豁免门禁，但报告中原样标注不隐藏）；
 新增 skill 的失败不追溯旧基线（新基线由 --update-baseline 建立后再门禁）。
 """
 
@@ -10,7 +11,11 @@ from .model import EvalReport
 
 
 def _skill_pass_rate(report: EvalReport, skill: str) -> float:
-    counted = [r for r in report.results if r.skill == skill and r.status != "skipped"]
+    counted = [
+        r
+        for r in report.results
+        if r.skill == skill and r.status != "skipped" and not (r.status == "fail" and r.known_issue)
+    ]
     if not counted:
         return 1.0
     return sum(1 for r in counted if r.status == "pass") / len(counted)

@@ -131,7 +131,9 @@ def _print_report(report: EvalReport, out: Path) -> None:
     avg = report.judge_avg()
     print(f"通过率 {report.pass_rate():.0%}  judge 均分 {f'{avg:.2f}' if avg is not None else '-'}")
     for r in report.results:
-        print(f"  {flag[r.status]} [{r.skill}] {r.case} ({r.layer}) {r.status}")
+        # known_issue 豁免不隐藏：结构性已知 fail 原样展示并显式标注
+        issue = " ⚠️known_issue" if r.known_issue and r.status == "fail" else ""
+        print(f"  {flag[r.status]} [{r.skill}] {r.case} ({r.layer}) {r.status}{issue}")
         if r.status in ("fail", "error") and r.detail:
             print(f"      {r.detail}")
     print(f"报告: {out}")

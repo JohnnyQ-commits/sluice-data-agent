@@ -22,6 +22,7 @@ _ALLOWED_KEYS = {
     "expect_skill",
     "script",
     "expect_guardrails",
+    "known_issue",
 }
 
 
@@ -36,6 +37,8 @@ class EvalCase:
     expect_skill: str = ""
     script: list[dict] = field(default_factory=list)
     expect_guardrails: list[dict] = field(default_factory=list)
+    # 结构性已知 fail 豁免（P4）：基线里如实记录的产品缺陷，不进通过率分母、不卡门禁
+    known_issue: bool = False
 
     @classmethod
     def from_dict(cls, skill: str, raw: dict) -> EvalCase:
@@ -60,6 +63,7 @@ class EvalCase:
             expect_skill=raw.get("expect_skill", ""),
             script=list(raw.get("script", [])),
             expect_guardrails=list(raw.get("expect_guardrails", [])),
+            known_issue=bool(raw.get("known_issue", False)),
         )
 
 
@@ -70,6 +74,7 @@ class CaseResult:
     layer: str
     status: str  # pass | fail | error | skipped
     detail: dict = field(default_factory=dict)
+    known_issue: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -78,6 +83,7 @@ class CaseResult:
             "layer": self.layer,
             "status": self.status,
             "detail": self.detail,
+            "known_issue": self.known_issue,
         }
 
 

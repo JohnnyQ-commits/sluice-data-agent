@@ -100,7 +100,9 @@ class GuardrailRunner:
             rt = ReActRuntime(client, registry, max_rounds=EVAL_MAX_ROUNDS, guardrails=chain)
             rt.run(case.input, on_event=events.append)
         except SluiceError as exc:  # 轮次耗尽/超预算/剧本耗尽 = 剧本与行为不符或门禁终止
-            return CaseResult(case.skill, case.name, case.layer, "error", {"error": str(exc)})
+            return CaseResult(
+                case.skill, case.name, case.layer, "error", {"error": str(exc)}, case.known_issue
+            )
         except Exception as exc:  # noqa: BLE001 — 坏用例兜底：单个用例归 error，不炸整批评测
             return CaseResult(
                 case.skill,
@@ -108,6 +110,7 @@ class GuardrailRunner:
                 case.layer,
                 "error",
                 {"error": f"{type(exc).__name__}: {exc}"},
+                case.known_issue,
             )
         got = [
             {"gate": e["gate"], "action": e["action"]} for e in events if e["type"] == "guardrail"
@@ -119,6 +122,7 @@ class GuardrailRunner:
             case.layer,
             "pass" if not missing else "fail",
             {"expected": case.expect_guardrails, "got": got},
+            case.known_issue,
         )
 
 
@@ -145,7 +149,9 @@ class BehaviorRunner:
             prefixes = {n.split(".", 1)[0] for n in used if "." in n}
             ok = (case.expect_skill in prefixes) if case.expect_skill else not used
         except SluiceError as exc:  # 网关等已知错误 = 用例归 error，不炸整批评测
-            return CaseResult(case.skill, case.name, case.layer, "error", {"error": str(exc)})
+            return CaseResult(
+                case.skill, case.name, case.layer, "error", {"error": str(exc)}, case.known_issue
+            )
         except Exception as exc:  # noqa: BLE001 — 坏用例兜底：单个用例归 error，不炸整批评测
             return CaseResult(
                 case.skill,
@@ -153,6 +159,7 @@ class BehaviorRunner:
                 case.layer,
                 "error",
                 {"error": f"{type(exc).__name__}: {exc}"},
+                case.known_issue,
             )
         return CaseResult(
             case.skill,
@@ -160,6 +167,7 @@ class BehaviorRunner:
             case.layer,
             "pass" if ok else "fail",
             {"used_tools": used, "expect_skill": case.expect_skill},
+            case.known_issue,
         )
 
 
@@ -191,7 +199,12 @@ class OutcomeRunner:
         except (RoundsExhaustedError, BudgetExceededError) as exc:
             # 轮次耗尽/超预算 = 产出失败（fail 不是 error），记入产出质量
             return CaseResult(
-                case.skill, case.name, case.layer, "fail", {"error": f"{type(exc).__name__}: {exc}"}
+                case.skill,
+                case.name,
+                case.layer,
+                "fail",
+                {"error": f"{type(exc).__name__}: {exc}"},
+                case.known_issue,
             )
         except SluiceError as exc:  # 网关故障（超时/连接/HTTP）= 评测引擎故障，不冒充质量问题
             return CaseResult(
@@ -200,6 +213,7 @@ class OutcomeRunner:
                 case.layer,
                 "error",
                 {"error": f"{type(exc).__name__}: {exc}"},
+                case.known_issue,
             )
         except Exception as exc:  # noqa: BLE001 — 坏用例兜底：单个用例归 error，不炸整批评测
             return CaseResult(
@@ -208,6 +222,7 @@ class OutcomeRunner:
                 case.layer,
                 "error",
                 {"error": f"{type(exc).__name__}: {exc}"},
+                case.known_issue,
             )
         missing = [s for s in case.must_contain if s not in answer]
         detail: dict = {"missing": missing, "answer_head": answer[:200]}
@@ -233,6 +248,7 @@ class OutcomeRunner:
             case.layer,
             "pass" if not missing else "fail",
             detail,
+            case.known_issue,
         )
 
 
@@ -270,7 +286,12 @@ def run_eval(
             except ValueError as exc:
                 results.append(
                     CaseResult(
-                        pkg.name, str(raw.get("name", "?")), "invalid", "error", {"error": str(exc)}
+                        pkg.name,
+                        str(raw.get("name", "?")),
+                        "invalid",
+                        "error",
+                        {"error": str(exc)},
+                        bool(raw.get("known_issue", False)) if isinstance(raw, dict) else False,
                     )
                 )
                 continue
@@ -285,6 +306,7 @@ def run_eval(
                             case.layer,
                             "skipped",
                             {"reason": _NO_KEY_REASON},
+                            case.known_issue,
                         )
                     )
                 else:
@@ -298,6 +320,7 @@ def run_eval(
                             case.layer,
                             "skipped",
                             {"reason": _NO_KEY_REASON},
+                            case.known_issue,
                         )
                     )
                 else:

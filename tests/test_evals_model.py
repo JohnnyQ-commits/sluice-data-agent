@@ -119,6 +119,18 @@ def test_allowed_keys_synced_with_dataclass_fields():
     assert {f.name for f in dataclasses.fields(EvalCase)} - {"skill"} == model._ALLOWED_KEYS
 
 
+def test_known_issue_field_roundtrip():
+    """known_issue 进 EvalCase 与 CaseResult，且 JSON roundtrip 保留（P4：结构性已知 fail 豁免门禁）。"""
+    case = EvalCase.from_dict(
+        "s", {"name": "c", "layer": "behavior", "input": "x", "known_issue": True}
+    )
+    assert case.known_issue is True
+    default = EvalCase.from_dict("s", {"name": "c", "layer": "behavior", "input": "x"})
+    assert default.known_issue is False
+    r = CaseResult("s", "c", "behavior", "fail", known_issue=True)
+    assert EvalReport(results=[r]).to_dict()["results"][0]["known_issue"] is True
+
+
 def test_save_load_roundtrip(tmp_path):
     r = EvalReport(
         results=[

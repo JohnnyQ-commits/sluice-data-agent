@@ -148,6 +148,17 @@ def test_eval_unknown_skill_exits_2(tmp_path, monkeypatch):
     assert ei.value.code == 2
 
 
+def test_report_marks_known_issue(capsys):
+    from sluice.cli.main import _print_report
+    from sluice.evals.model import CaseResult, EvalReport
+
+    _print_report(
+        EvalReport(results=[CaseResult("s", "route", "behavior", "fail", known_issue=True)]),
+        out=None,
+    )
+    assert "known_issue" in capsys.readouterr().out
+
+
 def test_eval_update_baseline_writes_file(tmp_path, monkeypatch):
     _patch_cli(monkeypatch, tmp_path, [_stub_pkg()])
     with pytest.raises(SystemExit) as ei:

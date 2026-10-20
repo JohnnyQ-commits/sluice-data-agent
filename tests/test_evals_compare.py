@@ -65,6 +65,42 @@ def test_new_skill_added_is_neutral():
     assert ok  # 新增 skill 的失败不追溯旧基线
 
 
+def test_known_issue_fail_exempt_from_gate():
+    """known_issue 的 fail 不进通过率分母：基线豁免的结构性 fail 不拖累也卡不住门禁。"""
+    base = _report(
+        [
+            CaseResult("s", "a", "guardrail", "pass"),
+            CaseResult("s", "route", "behavior", "fail", known_issue=True),
+        ]
+    )
+    new = _report(
+        [
+            CaseResult("s", "a", "guardrail", "pass"),
+            CaseResult("s", "route", "behavior", "fail", known_issue=True),
+        ]
+    )
+    ok, _ = compare(new, base)
+    assert ok  # 两侧 known_issue fail 均不计分
+
+
+def test_known_issue_does_not_mask_real_regression():
+    """豁免只对 known_issue fail 生效：同 skill 普通 fail 下降仍报警。"""
+    base = _report(
+        [
+            CaseResult("s", "a", "guardrail", "pass"),
+            CaseResult("s", "route", "behavior", "fail", known_issue=True),
+        ]
+    )
+    new = _report(
+        [
+            CaseResult("s", "a", "guardrail", "fail"),
+            CaseResult("s", "route", "behavior", "fail", known_issue=True),
+        ]
+    )
+    ok, _ = compare(new, base)
+    assert not ok
+
+
 def test_vanished_skill_fails():
     """基线有结果的 skill 在新报告中整体消失（如加载失败）→ 门禁 fail。"""
     base = _report(
