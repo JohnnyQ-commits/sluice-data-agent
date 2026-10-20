@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: ruff check src/ tests/ scripts/
+      - run: pytest tests/ -q
+
+  eval-gate:
+    # ①② 层有真实 LLM 成本：仅手动触发；secret 未配置时自动跳过
+    # 评测门禁本身（基线比对）在评测内完成：分数下降 exit 1
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: python scripts/seed_demo_db.py
+      - name: 评测门禁（基线比对，分数下降即 fail）
+        env:
+          SLUICE_LLM_API_KEY: ${{ secrets.SLUICE_LLM_API_KEY }}
+          SLUICE_LLM_BASE_URL: ${{ secrets.SLUICE_LLM_BASE_URL }}
+          SLUICE_LLM_MODEL: ${{ secrets.SLUICE_LLM_MODEL }}
+        run: |
+          if [ -z "$SLUICE_LLM_API_KEY" ]; then echo "未配置 SLUICE_LLM_API_KEY，跳过评测门禁"; exit 0; fi
+          python -m sluice eval --all --baseline evals/baseline.json
