@@ -93,7 +93,11 @@ class EvalReport:
     generated_at: str = field(default_factory=lambda: time.strftime("%Y-%m-%d %H:%M:%S"))
 
     def pass_rate(self) -> float:
-        """通过率；skipped 不进分母（无 API key 时 outcome/behavior 全 skipped，不算 0 分）。"""
+        """通过率；skipped 不进分母（无 API key 时 outcome/behavior 全 skipped，不算 0 分）。
+
+        这是报告透明口径：known_issue 的 fail 照常计分展示，让报告如实反映全貌；
+        门禁豁免口径（known_issue fail 不进分母）在 compare._skill_pass_rate，两者是有意差异。
+        """
         counted = [r for r in self.results if r.status != "skipped"]
         if not counted:
             return 1.0
@@ -104,10 +108,14 @@ class EvalReport:
 
         脏 detail（缺 judge_avg 键 / 字符串分数 / bool 分数 / judge_valid 非严格 True）
         一律静默跳过，评测层宁缺不错，不因单条脏数据丢整份报告。
+        known_issue 的 fail 同样不计入均分——与 compare._skill_pass_rate 的豁免口径对称
+        （两侧豁免须同步：pass_rate 侧豁免而 judge 侧计分会漏放结构性波动卡门禁）。
         """
         scores = []
         for r in self.results:
             if r.layer != "outcome" or r.detail.get("judge_valid") is not True:
+                continue
+            if r.status == "fail" and r.known_issue:
                 continue
             value = r.detail.get("judge_avg")
             if isinstance(value, (int, float)) and not isinstance(value, bool):

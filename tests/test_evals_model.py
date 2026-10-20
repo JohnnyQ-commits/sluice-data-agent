@@ -131,6 +131,31 @@ def test_known_issue_field_roundtrip():
     assert EvalReport(results=[r]).to_dict()["results"][0]["known_issue"] is True
 
 
+def test_judge_avg_excludes_known_issue_fail():
+    """judge_avg 与 _skill_pass_rate 豁免对称：known_issue 的 fail 不计均分。"""
+    r = EvalReport(
+        results=[
+            CaseResult("s", "a", "outcome", "pass", {"judge_avg": 4.0, "judge_valid": True}),
+            CaseResult(
+                "s", "b", "outcome", "fail", {"judge_avg": 1.0, "judge_valid": True}, known_issue=True
+            ),
+        ]
+    )
+    assert r.judge_avg() == 4.0  # 豁免条目不进均值，只算正常条目
+
+
+def test_judge_avg_all_known_issue_fail_is_none():
+    """全是 known_issue fail 时无有效分 → None（宁缺不错口径）。"""
+    r = EvalReport(
+        results=[
+            CaseResult(
+                "s", "b", "outcome", "fail", {"judge_avg": 1.0, "judge_valid": True}, known_issue=True
+            )
+        ]
+    )
+    assert r.judge_avg() is None
+
+
 def test_save_load_roundtrip(tmp_path):
     r = EvalReport(
         results=[

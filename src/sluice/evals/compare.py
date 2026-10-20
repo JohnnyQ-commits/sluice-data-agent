@@ -2,7 +2,9 @@
 
 比对只看两个报告共有 skill 的可计数结果；skipped 不进分母，
 known_issue 的 fail 同样不进分母（结构性已知缺陷豁免门禁，但报告中原样标注不隐藏）；
+error 即使 known_issue 也不豁免（评测引擎故障不冒充已知缺陷）。
 新增 skill 的失败不追溯旧基线（新基线由 --update-baseline 建立后再门禁）。
+known_issue 旗标一旦增删（用例修复或新豁免），须 --update-baseline 重建基线后再门禁。
 """
 
 from __future__ import annotations

@@ -101,6 +101,26 @@ def test_known_issue_does_not_mask_real_regression():
     assert not ok
 
 
+def test_known_issue_error_not_exempt():
+    """error 即使 known_issue 也不豁免：按 0 分进分母，分数下降仍卡门禁（防过滤被泛化）。"""
+    base = _report(
+        [
+            CaseResult("s", "a", "guardrail", "pass"),
+            CaseResult("s", "c", "outcome", "error", known_issue=True),
+        ]
+    )
+    new = _report(
+        [
+            CaseResult("s", "a", "guardrail", "fail"),
+            CaseResult("s", "c", "outcome", "error", known_issue=True),
+        ]
+    )
+    ok, lines = compare(new, base)
+    assert not ok
+    # 50%→0% 证明 error 条目两侧都在分母里（若被豁免基线会是 100%）
+    assert any("50%" in line and "0%" in line for line in lines)
+
+
 def test_vanished_skill_fails():
     """基线有结果的 skill 在新报告中整体消失（如加载失败）→ 门禁 fail。"""
     base = _report(
