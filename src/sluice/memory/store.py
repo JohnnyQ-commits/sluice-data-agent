@@ -74,12 +74,22 @@ class FaissStore:
             payload = json.loads(meta_file.read_text(encoding="utf-8"))
             self._texts = payload["texts"]
             self._metas = payload["metas"]
+            if self._index.ntotal != len(self._texts):
+                raise RuntimeError(
+                    f"向量存储加载失败：索引条数({self._index.ntotal})与元数据条数({len(self._texts)})不一致，"
+                    f"上次持久化可能半写残留（{self._path.with_suffix('.faiss')} vs "
+                    f"{self._path.with_suffix('.meta.json')}），请删除这两个文件后重建索引"
+                )
 
     def upsert(self, texts: list[str], metas: list[dict] | None = None) -> None:
         if not texts:
             return
         metas = metas or [{} for _ in texts]
         vecs = self._np.array(self._embed(texts), dtype="float32")
+        if vecs.shape[0] != len(texts):
+            raise ValueError(
+                f"embedder 返回条数({vecs.shape[0]})与输入条数({len(texts)})不符，拒绝写入以防文本-向量错位"
+            )
         self._faiss.normalize_L2(vecs)
         self._index.add(vecs)
         self._texts.extend(texts)
@@ -128,6 +138,10 @@ class GatewayEmbedder:
 
     def __call__(self, texts: list[str]) -> list[list[float]]:
         resp = self._client.post("/v1/embeddings", json={"model": self._model, "input": texts})
-        resp.raise_for_status()
-        data = resp.json()["data"]
-        return [item["embedding"] for item in data]
+        if resp.status_code >= 400:
+            raise ValueError(f"embeddings 请求失败 HTTP {resp.status_code}: {resp.text[:200]}")
+        payload = resp.json()
+        if "data" not in payload:
+            raise ValueError(f"embeddings 响应缺 'data' 字段: {resp.text[:200]}")
+        items = sorted(payload["data"], key=lambda x: x.get("index", 0))
+        return [item["embedding"] for item in items]

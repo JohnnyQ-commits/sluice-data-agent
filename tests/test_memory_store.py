@@ -1,8 +1,11 @@
 """向量记忆测试：Store 抽象 + FAISS Flat 后端 + Embedder 注入（HashEmbedder 零网络）。"""
 
 import json
+from pathlib import Path
 
 import httpx
+import numpy as np
+import pytest
 
 from sluice.memory.store import FaissStore, GatewayEmbedder, HashEmbedder, VectorHit
 
@@ -67,3 +70,48 @@ def test_gateway_embedder_parses_openai_style():
         transport=httpx.MockTransport(handler),
     )
     assert embed(["你好"]) == [[0.1, 0.2]]
+
+
+def test_gateway_embedder_http_error_includes_snippet():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="gateway boom detail-xyz")
+
+    embed = GatewayEmbedder(
+        base_url="https://gw.example",
+        api_key="k",
+        model="embedding-1",
+        transport=httpx.MockTransport(handler),
+    )
+    with pytest.raises(ValueError, match="gateway boom detail-xyz"):
+        embed(["你好"])
+
+
+def test_gateway_embedder_missing_data_raises():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"error": "no data field here"})
+
+    embed = GatewayEmbedder(
+        base_url="https://gw.example",
+        api_key="k",
+        model="embedding-1",
+        transport=httpx.MockTransport(handler),
+    )
+    with pytest.raises(ValueError, match="no data field here"):
+        embed(["你好"])
+
+
+def test_faiss_store_corrupt_half_write_raises_on_load(tmp_path):
+    """复现半写场景：.faiss 3 条 + .meta.json 2 条 → 构造时立即 raise，不许静默加载拖到查询才 IndexError。"""
+    import faiss
+
+    path = Path(str(tmp_path / "v"))
+    idx = faiss.IndexFlatIP(64)
+    vecs = np.eye(3, 64, dtype="float32")  # 3 条 64 维
+    faiss.normalize_L2(vecs)
+    idx.add(vecs)
+    faiss.write_index(idx, str(path.with_suffix(".faiss")))
+    path.with_suffix(".meta.json").write_text(
+        json.dumps({"texts": ["只有", "两条"], "metas": [{}, {}]}, ensure_ascii=False), encoding="utf-8"
+    )
+    with pytest.raises(RuntimeError, match="条数.*不一致"):
+        FaissStore(embed=HashEmbedder(dim=64), dim=64, path=str(path))
