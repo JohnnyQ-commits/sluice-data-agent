@@ -28,7 +28,10 @@ class BudgetExceededError(SluiceError):
 
 
 class MCPError(SluiceError):
-    """MCP 协议/工具调用错误。"""
+    """MCP 协议/工具调用错误。
+
+    捕获时 MCPTimeoutError/MCPTransportError 必须置于 except MCPError 之前。
+    """
 
 
 class MCPTransportError(MCPError):

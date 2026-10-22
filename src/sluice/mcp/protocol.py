@@ -50,13 +50,22 @@ def parse_message(line: str) -> dict[str, Any]:
 
 
 def extract_result_text(response: dict[str, Any]) -> str:
-    """tools/call 响应 → 文本内容拼接（text 块以换行连接，其他类型块忽略）。"""
+    """tools/call 响应 → 文本内容拼接（text 块以换行连接，其他类型块忽略）。
+
+    error 响应显式抛 MCPError——不静默吞成空串（防御纵深：T7 transport 也会先检 error）。
+    """
+    if "error" in response:
+        raise MCPError(f"MCP 响应错误: {json.dumps(response['error'], ensure_ascii=False)[:200]}")
     content = (response.get("result") or {}).get("content") or []
-    return "\n".join(b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+    return "\n".join(b.get("text") or "" for b in content if isinstance(b, dict) and b.get("type") == "text")
 
 
 def encode_request(method: str, params: dict[str, Any], req_id: int | None) -> str:
-    """单行 JSON-RPC 2.0 消息；req_id=None 为通知（无 id 字段）。公开给 transport 复用。"""
+    """单行 JSON-RPC 2.0 消息；req_id=None 为通知（无 id 字段）。公开给 transport 复用。
+
+    返回裸 UTF-8 文本；transport 必须在 Popen 两端显式 encoding='utf-8'
+    （Windows 默认 locale 编码会炸中文）。
+    """
     msg: dict[str, Any] = {"jsonrpc": "2.0", "method": method, "params": params}
     if req_id is not None:
         msg["id"] = req_id

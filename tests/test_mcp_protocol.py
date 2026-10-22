@@ -6,8 +6,10 @@ import pytest
 
 from sluice.exceptions import MCPError
 from sluice.mcp.protocol import (
+    encode_request,
     extract_result_text,
     initialize_request,
+    initialized_notification,
     parse_message,
     tools_call_request,
     tools_list_request,
@@ -52,3 +54,25 @@ def test_extract_result_text_joins_text_blocks():
 
 def test_extract_result_text_empty_content():
     assert extract_result_text({"result": {"content": []}}) == ""
+
+
+def test_extract_result_text_none_text_treated_as_empty():
+    resp = {"result": {"content": [{"type": "text", "text": None}, {"type": "text", "text": "b"}]}}
+    assert extract_result_text(resp) == "\nb"
+
+
+def test_extract_result_text_raises_on_error_response():
+    resp = {"error": {"code": -32601, "message": "Method not found"}}
+    with pytest.raises(MCPError, match="MCP 响应错误"):
+        extract_result_text(resp)
+
+
+def test_initialized_notification_has_no_id():
+    msg = json.loads(initialized_notification())
+    assert msg["method"] == "notifications/initialized" and "id" not in msg
+
+
+def test_encode_request_roundtrip_unicode_and_newline():
+    line = encode_request("tools/call", {"name": "echo", "arguments": {"text": "中文\n第二行"}}, 9)
+    msg = parse_message(line)
+    assert msg["id"] == 9 and msg["params"]["arguments"]["text"] == "中文\n第二行"
