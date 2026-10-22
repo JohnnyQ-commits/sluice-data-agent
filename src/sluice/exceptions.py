@@ -25,3 +25,15 @@ class RoundsExhaustedError(SluiceError):
 
 class BudgetExceededError(SluiceError):
     """ReAct 循环超出 token 预算（终止级门禁）。"""
+
+
+class MCPError(SluiceError):
+    """MCP 协议/工具调用错误。"""
+
+
+class MCPTransportError(MCPError):
+    """MCP 子进程传输层错误（进程退出/管道断裂）。"""
+
+
+class MCPTimeoutError(MCPError):
+    """MCP 请求超时。"""
