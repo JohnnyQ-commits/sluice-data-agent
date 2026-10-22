@@ -5,7 +5,7 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 .env
-data/*.db
+data/
 audit/
 evals/reports/
 .idea/

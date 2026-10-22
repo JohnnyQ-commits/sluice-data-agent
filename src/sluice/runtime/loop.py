@@ -53,9 +53,16 @@ class ReActRuntime:
         self._guardrails = guardrails
         self.trace: list[dict] = []  # 每轮轨迹，P1 经 SSE 推给前端
 
-    def run(self, user_input: str, on_event: Callable[[dict], None] | None = None) -> str:
+    def run(
+        self,
+        user_input: str,
+        on_event: Callable[[dict], None] | None = None,
+        system: str | None = None,
+    ) -> str:
         # run 级 on_event 非 None 时覆盖构造器值（Flask 每请求独立队列）
         effective = on_event if on_event is not None else self._on_event
+        # run 级 system 非 None 时覆盖构造器值（记忆接线按消息重算 Skill 子集用；缺省零变化）
+        run_system = system if system is not None else self._system
         # trace 局部累积、结束原子赋值：并发 run 互不串写，结束后 last-writer-wins
         local_trace: list[dict] = []
         messages: list[Message] = [Message("user", [TextBlock(user_input)])]
@@ -65,14 +72,21 @@ class ReActRuntime:
         try:
             for round_no in range(1, self._max_rounds + 1):
                 response = self._client.chat(
-                    messages, system=self._system, tools=self._registry.to_defs()
+                    messages, system=run_system, tools=self._registry.to_defs()
                 )
                 self._emit(effective, {"type": "round_start", "round": round_no})
                 tool_uses = response.tool_uses
 
                 if not tool_uses:  # Final Answer → 拦截点③输出门禁 + 拦截点④自修
                     return self._deliver_output(
-                        messages, effective, local_trace, round_no, response, used_tools, behavior
+                        messages,
+                        effective,
+                        local_trace,
+                        round_no,
+                        response,
+                        used_tools,
+                        behavior,
+                        run_system,
                     )
 
                 messages.append(Message("assistant", response.content))
@@ -169,6 +183,7 @@ class ReActRuntime:
         response: LLMResponse,
         used_tools: list[str],
         behavior: BehaviorGate | None,
+        run_system: str,
     ) -> str:
         """拦截点③输出门禁 + 拦截点④恢复策略：定向自修一轮，复检通过才采用。
 
@@ -201,7 +216,7 @@ class ReActRuntime:
         messages.append(Message("user", [TextBlock("\n".join(retry_lines))]))
         try:
             retry_resp = self._client.chat(
-                messages, system=self._system, tools=self._registry.to_defs()
+                messages, system=run_system, tools=self._registry.to_defs()
             )
         except Exception as exc:  # noqa: BLE001 — 自修轮网关异常降级交付，不悬挂用户端
             degraded_reason = f"自修调用失败：{exc}"

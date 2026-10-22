@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     mcp_enabled: bool = False  # 默认关：无 .mcp.json 场景行为零变化
     mcp_config_path: str = ".mcp.json"  # 相对 repo 根
 
+    # Memory（P4）
+    memory_enabled: bool = False  # 默认关：P0-P3 行为零变化
+    memory_embed_model: str = ""  # 空 = HashEmbedder（无语义，测试/降级）；配置则走网关 /v1/embeddings
+    memory_skill_match_threshold: int = 8  # skill 数超过才启用语义召回
+    memory_max_turns: int = 10  # 会话轮数超过后摘要升入长期记忆
+    memory_base_dir: str = "data/memory"  # 相对 repo 根
+
     # Web / 数据
     demo_db_path: str = "data/demo.db"
 

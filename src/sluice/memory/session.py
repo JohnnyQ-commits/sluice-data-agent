@@ -32,6 +32,10 @@ class SessionStore:
             return []
         return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
+    def clear(self, user_id: str, session_id: str) -> None:
+        """清空该会话全部轮次（会话摘要升入向量库后由 SessionMemory 调用）。"""
+        self._session_file(user_id, session_id).write_text("", encoding="utf-8")
+
     def list_sessions(self, user_id: str) -> list[str]:
         d = self._base / user_id
         if not d.is_dir():
