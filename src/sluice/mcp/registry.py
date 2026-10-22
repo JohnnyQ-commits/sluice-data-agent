@@ -67,10 +67,19 @@ class McpServer:
 
 
 def discover(config_path: str | Path) -> list[McpServer]:
-    """解析 .mcp.json（mcpServers: {name: {command, args, timeout?}}）。"""
-    cfg = json.loads(Path(config_path).read_text(encoding="utf-8"))
+    """解析 .mcp.json（mcpServers: {name: {command, args, timeout?}}）。
+
+    配置错误走 MCPError 带路径/原因/服务名，便于 CLI 打友好错误而非裸 traceback。
+    """
+    path = Path(config_path)
+    try:
+        cfg = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise MCPError(f"配置文件无法解析: {path}: {exc}") from exc
     servers = []
     for name, spec in (cfg.get("mcpServers") or {}).items():
+        if "command" not in spec:
+            raise MCPError(f"MCP server '{name}' 缺少 command 配置: {path}")
         command = [spec["command"], *spec.get("args", [])]
         servers.append(McpServer(name, command, timeout=float(spec.get("timeout", 30.0))))
     return servers

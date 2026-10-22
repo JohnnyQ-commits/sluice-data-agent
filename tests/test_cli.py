@@ -78,3 +78,15 @@ def test_main_help():
 def test_parser_mcp_flags():
     args = cli_main.build_parser().parse_args(["mcp", "--call", "mcp__mini__echo", "--args", '{"text": "x"}'])
     assert args.command == "mcp" and args.call == "mcp__mini__echo"
+
+
+def test_mcp_malformed_config_exits_2_with_friendly_stderr(monkeypatch, capsys, tmp_path):
+    """CLI mcp 子命令：配置文件畸形 JSON → exit 2 + stderr 友好错误（含路径），不裸 traceback。"""
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text('{"mcpServers": {', encoding="utf-8")
+    monkeypatch.setenv("SLUICE_MCP_CONFIG_PATH", str(cfg))
+    with pytest.raises(SystemExit) as exc_info:
+        cli_main.main(["mcp"])
+    assert exc_info.value.code == 2
+    err = capsys.readouterr().err
+    assert "MCP 配置错误" in err and str(cfg) in err

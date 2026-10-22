@@ -160,9 +160,14 @@ def _mcp(args: argparse.Namespace) -> None:
         print("未找到 .mcp.json", file=sys.stderr)
         sys.exit(2)
 
+    from ..exceptions import MCPError
     from ..mcp.registry import load_mcp_tools  # 延迟导入：run/eval 子命令无需 MCP
 
-    servers = load_mcp_tools(config)
+    try:
+        servers = load_mcp_tools(config)
+    except MCPError as e:
+        print(f"MCP 配置错误: {e}", file=sys.stderr)
+        sys.exit(2)
     try:
         tools = [t for s in servers for t in s.tools]
         if not args.call:

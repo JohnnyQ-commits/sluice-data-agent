@@ -8,6 +8,7 @@ from typing import ClassVar
 
 import pytest
 
+from sluice.exceptions import MCPError
 from sluice.mcp.registry import discover, load_mcp_tools
 from sluice.tools.base import Tool, ToolResult
 from sluice.tools.registry import ToolRegistry
@@ -192,3 +193,25 @@ def test_to_def_shape_for_react_loop(tmp_path):
     finally:
         for s in servers:
             s.close()
+
+
+def test_discover_malformed_json_raises_mcp_error_with_path(tmp_path):
+    """畸形 JSON → MCPError（不再抛裸 json.JSONDecodeError），消息含配置文件路径与原因。"""
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text('{"mcpServers": {', encoding="utf-8")
+    with pytest.raises(MCPError) as exc_info:
+        discover(cfg)
+    msg = str(exc_info.value)
+    assert str(cfg) in msg and "配置文件无法解析" in msg
+
+
+def test_discover_missing_command_raises_mcp_error_with_server_name(tmp_path):
+    """server 条目缺 command 键 → MCPError 含 server 名（不再 KeyError）。"""
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(
+        json.dumps({"mcpServers": {"half": {"args": ["x"]}}}),
+        encoding="utf-8",
+    )
+    with pytest.raises(MCPError) as exc_info:
+        discover(cfg)
+    assert "half" in str(exc_info.value)
