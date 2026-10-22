@@ -2,12 +2,18 @@
 
 import json
 import sys
+import time
 from pathlib import Path
+from typing import ClassVar
+
+import pytest
 
 from sluice.mcp.registry import discover, load_mcp_tools
+from sluice.tools.base import Tool, ToolResult
 from sluice.tools.registry import ToolRegistry
 
 MINI_SERVER = str(Path(__file__).parent / "fixtures" / "mini_mcp_server.py")
+HUNG_SERVER = str(Path(__file__).parent / "fixtures" / "hung_mcp_server.py")
 
 
 def _config(tmp_path):
@@ -113,6 +119,64 @@ def test_tool_description_is_real_utf8(tmp_path):
     try:
         echo = next(t for s in servers for t in s.tools if t.name.endswith("echo"))
         assert echo.description == "回显输入"
+    finally:
+        for s in servers:
+            s.close()
+
+
+def test_load_mcp_tools_closes_hung_server(tmp_path):
+    """孤儿进程泄漏回归：挂起 server 握手超时被跳过后必须被 close——
+    hung server 在 stdin EOF 时写 marker，marker 出现即证明 close 已收掉管道（进程随之退出）。"""
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(
+        json.dumps({
+            "mcpServers": {
+                "hung": {
+                    "command": sys.executable,
+                    "args": [HUNG_SERVER, str(tmp_path / "hung.marker")],
+                    "timeout": 1.0,
+                },
+                "mini": {"command": sys.executable, "args": [MINI_SERVER]},
+            }
+        }),
+        encoding="utf-8",
+    )
+    servers = load_mcp_tools(cfg)
+    try:
+        assert [s.name for s in servers] == ["mini"]
+        marker = tmp_path / "hung.closed"
+        deadline = time.time() + 5
+        while time.time() < deadline and not marker.exists():
+            time.sleep(0.1)
+        assert marker.exists(), "挂起 server 未被 close（stdin 未收 EOF），存在孤儿进程泄漏"
+    finally:
+        for s in servers:
+            s.close()
+
+
+class _FakeBuiltin(Tool):
+    """内建占位工具：名字与 mini server 的 echo 注册名撞车，验证内建优先。"""
+
+    name = "mcp__mini__echo"
+    description = "内建占位"
+    parameters: ClassVar[dict] = {"type": "object", "properties": {}}
+
+    def execute(self, args: dict) -> ToolResult:
+        return ToolResult("builtin")
+
+
+def test_registry_builtin_wins_over_mcp_tool(tmp_path):
+    """内建优先级：同名冲突时 ValueError 且 registry 保留内建实例（锁住 web 接线
+    ValueError 去重的方向性，防未来误改成 MCP 覆盖式注册）。"""
+    servers = load_mcp_tools(_config(tmp_path))
+    try:
+        registry = ToolRegistry()
+        builtin = _FakeBuiltin()
+        registry.register(builtin)
+        mcp_echo = next(t for s in servers for t in s.tools if t.name.endswith("echo"))
+        with pytest.raises(ValueError):
+            registry.register(mcp_echo)
+        assert registry.get("mcp__mini__echo") is builtin
     finally:
         for s in servers:
             s.close()

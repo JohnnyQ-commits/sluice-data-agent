@@ -14,12 +14,10 @@ from typing import Any
 
 from ..exceptions import MCPError, MCPTimeoutError
 from ..tools.base import Tool, ToolResult
-from .protocol import extract_result_text
+from .protocol import PROTOCOL_VERSION, extract_result_text
 from .transport import StdioTransport
 
 logger = logging.getLogger(__name__)
-
-PROTOCOL_VERSION = "2024-11-05"
 
 
 class McpTool(Tool):
@@ -33,12 +31,12 @@ class McpTool(Tool):
     def execute(self, args: dict[str, Any]) -> ToolResult:
         try:
             resp = self._transport.request("tools/call", {"name": self._raw_name, "arguments": args})
+            result = resp.get("result") or {}
+            return ToolResult(extract_result_text(resp), is_error=bool(result.get("isError")))
         except MCPTimeoutError as exc:
             return ToolResult(f"MCP 工具 {self.name} 超时: {exc}", is_error=True)
         except MCPError as exc:
             return ToolResult(str(exc), is_error=True)
-        result = resp.get("result") or {}
-        return ToolResult(extract_result_text(resp), is_error=bool(result.get("isError")))
 
 
 class McpServer:
@@ -87,5 +85,6 @@ def load_mcp_tools(config_path: str | Path) -> list[McpServer]:
             started.append(server)
             logger.info("MCP server %s 就绪: %d 工具", server.name, len(server.tools))
         except MCPError as exc:
+            server.close()  # Popen 已成功但握手/列举失败：收掉子进程防孤儿泄漏（Popen 失败时 close 是无害 no-op）
             logger.warning("MCP server %s 启动失败，已跳过: %s", server.name, exc)
     return started

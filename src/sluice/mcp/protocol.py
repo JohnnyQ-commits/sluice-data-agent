@@ -14,31 +14,6 @@ from ..exceptions import MCPError
 PROTOCOL_VERSION = "2024-11-05"
 
 
-def initialize_request(req_id: int) -> str:
-    return encode_request(
-        "initialize",
-        {
-            "protocolVersion": PROTOCOL_VERSION,
-            "capabilities": {},
-            "clientInfo": {"name": "sluice", "version": "0.1.0"},
-        },
-        req_id,
-    )
-
-
-def initialized_notification() -> str:
-    """initialize 完成的通知（无 id，不期望响应）。"""
-    return encode_request("notifications/initialized", {}, None)
-
-
-def tools_list_request(req_id: int) -> str:
-    return encode_request("tools/list", {}, req_id)
-
-
-def tools_call_request(name: str, arguments: dict, req_id: int) -> str:
-    return encode_request("tools/call", {"name": name, "arguments": arguments}, req_id)
-
-
 def parse_message(line: str) -> dict[str, Any]:
     try:
         msg = json.loads(line)
