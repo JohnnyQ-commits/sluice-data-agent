@@ -6,6 +6,10 @@
 import json
 import sys
 
+# 锁 UTF-8 契约：Windows GBK 机器上默认 locale 编码写 stdout 会违反 stdio UTF-8 契约
+sys.stdin.reconfigure(encoding="utf-8")
+sys.stdout.reconfigure(encoding="utf-8")
+
 TOOLS = [
     {
         "name": "echo",

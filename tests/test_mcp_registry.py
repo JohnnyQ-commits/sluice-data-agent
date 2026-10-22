@@ -85,6 +85,39 @@ def test_load_mcp_tools_skips_broken_server(tmp_path, caplog):
             s.close()
 
 
+def test_load_mcp_tools_skips_nonexistent_command(tmp_path):
+    """kill switch 漏网修补：命令不存在时 Popen 抛原生 FileNotFoundError（OSError），
+    transport 归入 MCPTransportError 后 load_mcp_tools 同样警告跳过，不炸整个 load。"""
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(
+        json.dumps({
+            "mcpServers": {
+                "ghost": {"command": "definitely-not-exist-cmd", "args": []},
+                "mini": {"command": sys.executable, "args": [MINI_SERVER]},
+            }
+        }),
+        encoding="utf-8",
+    )
+    servers = load_mcp_tools(cfg)
+    try:
+        assert [s.name for s in servers] == ["mini"]
+    finally:
+        for s in servers:
+            s.close()
+
+
+def test_tool_description_is_real_utf8(tmp_path):
+    """编码契约：description 中文必须真解码（mini server 已锁 stdin/stdout UTF-8），
+    防 GBK 写端 + GBK 读端字节对消的假绿。"""
+    servers = load_mcp_tools(_config(tmp_path))
+    try:
+        echo = next(t for s in servers for t in s.tools if t.name.endswith("echo"))
+        assert echo.description == "回显输入"
+    finally:
+        for s in servers:
+            s.close()
+
+
 def test_to_def_shape_for_react_loop(tmp_path):
     """McpTool 能出 ToolDef（ReAct 循环消费的形态）。"""
     servers = load_mcp_tools(_config(tmp_path))

@@ -36,16 +36,19 @@ class StdioTransport:
         self._lock = threading.Lock()  # 串行化 request/notify/ensure_alive——并发 request 共享 _queue 会互偷响应
 
     def start(self) -> None:
-        self._proc = subprocess.Popen(
-            self._command,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            encoding="utf-8",
-            errors="replace",  # 非法字节不炸读线程（合法 UTF-8 含中文不受影响）
-            bufsize=1,
-        )
+        try:
+            self._proc = subprocess.Popen(
+                self._command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                encoding="utf-8",
+                errors="replace",  # 非法字节不炸读线程（合法 UTF-8 含中文不受影响）
+                bufsize=1,
+            )
+        except OSError as exc:  # 命令不存在等：Popen 抛原生 FileNotFoundError，归入 MCP 家族让调用方 kill switch 统一接住
+            raise MCPTransportError(f"MCP 子进程启动失败: {self._command} ({exc})") from exc
         threading.Thread(target=self._pump, daemon=True).start()
 
     def _pump(self) -> None:

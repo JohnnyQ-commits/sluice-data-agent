@@ -151,8 +151,8 @@ def _print_report(report: EvalReport, out: Path) -> None:
 def _mcp(args: argparse.Namespace) -> None:
     settings = Settings()
     config = _REPO_ROOT / settings.mcp_config_path
-    if not settings.mcp_enabled and not config.is_file():
-        print("未找到 .mcp.json（且未启用 mcp_enabled）", file=sys.stderr)
+    if not config.is_file():  # mcp_enabled 与否不影响：文件不存在就无从演示，直接退出
+        print("未找到 .mcp.json", file=sys.stderr)
         sys.exit(2)
 
     from ..mcp.registry import load_mcp_tools  # 延迟导入：run/eval 子命令无需 MCP
