@@ -10,3 +10,4 @@ audit/
 evals/reports/
 .idea/
 web_server*.log
+.mcp.json

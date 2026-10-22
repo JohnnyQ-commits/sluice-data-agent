@@ -89,6 +89,29 @@ sluice mcp --call <tool_name> --args '{}'
 }
 ```
 
+## MCP 生态
+
+Sluice 不锁工具生态：stdio 接入任意 MCP server，工具以 `mcp__<server>__<tool>` 命名挂进 ReAct 循环与 `sluice mcp`，公共 server 开箱即用。仓库提供 `.mcp.json.example`（公共 filesystem server，复制为 `.mcp.json` 即生效）：
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-filesystem", "examples"],
+      "timeout": 120
+    }
+  }
+}
+```
+
+实测两条命令（Windows 下 Popen 不解析 `npx` 的 `.cmd` shim 故包一层 `cmd /c`，POSIX 直接写 `"command": "npx"`；`timeout` 需覆盖 npx 冷启动的 30s+）：
+
+```bash
+sluice mcp   # 列出 14 个工具（read_file / edit_file / directory_tree / ...）
+sluice mcp --call mcp__filesystem__read_file --args '{"path": "langgraph_weekly/README.md"}'
+```
+
 ## Architecture
 
 ```mermaid

@@ -215,3 +215,13 @@ def test_discover_missing_command_raises_mcp_error_with_server_name(tmp_path):
     with pytest.raises(MCPError) as exc_info:
         discover(cfg)
     assert "half" in str(exc_info.value)
+
+
+def test_mcp_json_example_parses():
+    """公共 server 演示配置（.mcp.json.example）必须能被 discover 正常解析出 ≥1 个 server，
+    防 README/示例与 registry schema 漂移。"""
+    example = Path(__file__).resolve().parents[1] / ".mcp.json.example"
+    servers = discover(example)
+    assert len(servers) >= 1
+    assert servers[0].name == "filesystem"
+    assert servers[0]._command[0] == "cmd"
