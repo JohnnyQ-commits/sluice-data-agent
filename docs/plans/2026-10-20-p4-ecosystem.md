@@ -16,7 +16,7 @@
 2. **默认配置行为零变化**——`mcp_enabled=False`、`memory_enabled=False` 时，现有 199 个测试零改动全绿；`tests/test_runtime_events.py` 永不触碰
 3. **审计 kind 惯例**：`f"{gate}_blocked"` 全库唯一产生点是 `runtime/loop.py`，新代码不新增 kind、不绕过审计
 4. **kill switch**：任何新链路挂掉只降级不致命（MCP server 崩了警告跳过、记忆召回失败返回空串）
-5. **脱敏铁律**：[已脱敏]/[已脱敏]/[已脱敏] 永不以字面量进 tracked 文件
+5. **脱敏铁律**：公司名/公司域名/个人工号等内部敏感词永不以字面量进 tracked 文件（规则本体也不得包含字面量——本行即示范）
 6. commit 一行中文、无 Co-Authored-By；文件操作用完整 Windows 绝对路径；测试命令 `.venv/Scripts/python -m pytest`（repo 根，bash）
 
 ## 文件结构地图
