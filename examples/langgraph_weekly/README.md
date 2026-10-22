@@ -18,7 +18,7 @@
 
 实测版本：langgraph 1.2.16（连带拉入 langchain-core 1.6.13 / langchain-protocol 0.0.20 等依赖，装包面明显比 Sluice 零依赖 harness 重）。
 
-- **TypedDict 状态合并**：节点只返回增量 dict（`{"sql": ...}`），StateGraph 自动 merge 进全量 state——比 Sluice 的 WorkflowState 全量透传省事；但 merge 是按 key last-write-wins，没有类型校验，列表字段（rows）替换而非追加，复杂状态要自己上 reducer（Annotated + operator.add）才有合并语义。
+- **TypedDict 状态合并**：节点只返回增量 dict（`{"sql": ...}`），StateGraph 自动 merge 进全量 state——比 Sluice ReAct 循环的 messages 全量列表透传省事；但 merge 是按 key last-write-wins，没有类型校验，列表字段（rows）替换而非追加，复杂状态要自己上 reducer（Annotated + operator.add）才有合并语义。
 - **API 面**：add_node/add_edge/set_entry_point/compile 五件套是纯显式接线，三节点八行——可读性极好、流向一目了然（Sluice 的 ReAct 循环流向藏在 loop 的 while 里）；代价是线性管道写起来反而比 Sluice 一个 for 循环啰嗦，价值要到 conditional edges（分支/回跳）才体现。
 - **StubClient 暴露的范式差异**：静态图里模型不决定控制流，测试里"按前缀出招"的 StubClient（SQL prompt→SQL 文本，render prompt→周报文本）本质是把模型自主性替换成了 if 分支——这正是对比锚点：Sluice 的行为门禁管的是"模型选了什么工具"，图范式下这个问题不存在，但"节点失败怎么自修"也没有现成答案。
 - **类型对接零摩擦**：Sluice 的 `Message("user", [TextBlock(text)])` 与 `resp.text` 属性在图节点里直接可用，client 同构注入（build_graph 参数）比全局 LLM 单例干净。

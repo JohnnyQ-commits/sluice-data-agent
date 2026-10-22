@@ -8,7 +8,7 @@ from examples.langgraph_weekly.graph import build_graph
 
 
 class StubClient:
-    """chat 按前缀出招：SQL 生成 → 指标提取。"""
+    """chat 按前缀出招：SQL 生成 → 周报渲染。"""
 
     def chat(self, messages, system=None, tools=None):
         from sluice.llm.types import LLMResponse, TextBlock
@@ -27,4 +27,5 @@ def test_graph_runs_end_to_end():
 
     graph = build_graph(client=StubClient(), query_fn=fake_query)
     state = graph.invoke({"question": "上周各城市销量"})
+    assert state["sql"].startswith("SELECT")
     assert state["report"] and "杭州" in state["report"]
