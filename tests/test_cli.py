@@ -15,3 +15,8 @@ def test_main_help():
     with pytest.raises(SystemExit) as exc_info:
         cli_main.main(["--help"])
     assert exc_info.value.code == 0
+
+
+def test_parser_mcp_flags():
+    args = cli_main.build_parser().parse_args(["mcp", "--call", "mcp__mini__echo", "--args", '{"text": "x"}'])
+    assert args.command == "mcp" and args.call == "mcp__mini__echo"

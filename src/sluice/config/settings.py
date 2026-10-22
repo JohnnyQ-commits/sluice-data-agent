@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     eval_judge_threshold: float = 4.0  # judge 有效项均分低于此值 → 用例 fail
     eval_judge_model: str = ""  # 空 = 复用 llm_model；judge 与被评模型可分离
 
+    # MCP（P4）
+    mcp_enabled: bool = False  # 默认关：无 .mcp.json 场景行为零变化
+    mcp_config_path: str = ".mcp.json"  # 相对 repo 根
+
     # Web / 数据
     demo_db_path: str = "data/demo.db"
 

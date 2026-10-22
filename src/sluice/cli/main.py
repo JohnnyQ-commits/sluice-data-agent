@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from datetime import datetime
@@ -48,6 +49,9 @@ def build_parser() -> argparse.ArgumentParser:
     eval_p.add_argument(
         "--skip-judge", action="store_true", help="跳过 LLM-as-judge（只跑确定性断言）"
     )
+    mcp_p = sub.add_parser("mcp", help="MCP 工具发现与调用演示（读 .mcp.json）")
+    mcp_p.add_argument("--call", metavar="TOOL", help="调用指定工具（如 mcp__mini__echo）")
+    mcp_p.add_argument("--args", metavar="JSON", default="{}", help="工具参数 JSON")
     return parser
 
 
@@ -59,6 +63,8 @@ def main(argv: list[str] | None = None) -> None:
         _web(args)
     elif args.command == "eval":
         _eval(args)
+    elif args.command == "mcp":
+        _mcp(args)
 
 
 def _list_skills(skills_dir: str | Path = "skills") -> list[str]:
@@ -140,6 +146,35 @@ def _print_report(report: EvalReport, out: Path) -> None:
         if r.status in ("fail", "error") and r.detail:
             print(f"      {r.detail}")
     print(f"报告: {out}")
+
+
+def _mcp(args: argparse.Namespace) -> None:
+    settings = Settings()
+    config = _REPO_ROOT / settings.mcp_config_path
+    if not settings.mcp_enabled and not config.is_file():
+        print("未找到 .mcp.json（且未启用 mcp_enabled）", file=sys.stderr)
+        sys.exit(2)
+
+    from ..mcp.registry import load_mcp_tools  # 延迟导入：run/eval 子命令无需 MCP
+
+    servers = load_mcp_tools(config)
+    try:
+        tools = [t for s in servers for t in s.tools]
+        if not args.call:
+            for t in tools:
+                print(f"{t.name}  {t.description}")
+            print(f"共 {len(tools)} 个 MCP 工具")
+            return
+        tool = next((t for t in tools if t.name == args.call), None)
+        if tool is None:
+            print(f"未找到工具: {args.call}", file=sys.stderr)
+            sys.exit(2)
+        result = tool.execute(json.loads(args.args))
+        print(result.content)
+        sys.exit(1 if result.is_error else 0)
+    finally:
+        for s in servers:
+            s.close()
 
 
 def _web(args: argparse.Namespace) -> None:

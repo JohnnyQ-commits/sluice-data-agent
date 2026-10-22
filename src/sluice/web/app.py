@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import queue
 import threading
 import uuid
@@ -21,6 +22,8 @@ from ..tools.registry import ToolRegistry
 
 _FRONTEND_DIST = Path(__file__).resolve().parents[3] / "web" / "frontend" / "dist"
 
+logger = logging.getLogger(__name__)
+
 
 def _stream_idle_timeout(settings: Settings) -> float:
     """SSE 空闲超时：盖过 LLM 客户端重试链的最坏静默（(重试数+1)×超时 + 余量），不误杀健康长轮次。"""
@@ -37,6 +40,24 @@ def create_app(client=None, registry=None, runtime=None, skills_dir="skills") ->
         registry.register(QueryDataTool(settings.demo_db_path))
     packages = SkillLoader().load(skills_dir, registry) if skills_dir else []
     app.config["SLUICE_SKILLS"] = packages  # CLI 横幅等外部取清单用，避免二次 load
+
+    # MCP 可选接线（默认关：mcp_enabled=False 时行为零变化）
+    if settings.mcp_enabled:
+        from ..mcp.registry import load_mcp_tools
+
+        mcp_config = Path(__file__).resolve().parents[3] / settings.mcp_config_path
+        if mcp_config.is_file():
+            import atexit
+
+            mcp_servers = load_mcp_tools(mcp_config)
+            for server in mcp_servers:
+                for t in server.tools:
+                    try:
+                        registry.register(t)
+                    except ValueError:
+                        logger.warning("MCP 工具重名跳过: %s", t.name)
+            atexit.register(lambda: [s.close() for s in mcp_servers])
+
     guardrails = GuardrailChain(settings, packages) if settings.guardrails_enabled else None
     runtime = runtime or ReActRuntime(
         client,
