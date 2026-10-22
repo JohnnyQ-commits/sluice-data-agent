@@ -207,9 +207,12 @@ def _run(message: str) -> None:
         print("缺少 SLUICE_LLM_API_KEY（复制 .env.example 为 .env 并填写）", file=sys.stderr)
         sys.exit(1)
 
+    # 与 web 同源装配：QueryDataTool + Skill 包工具全量挂载，run 才能真跑 Skill
     registry = ToolRegistry()
     registry.register(EchoTool())
-    guardrails = GuardrailChain(settings) if settings.guardrails_enabled else None
+    registry.register(QueryDataTool(settings.demo_db_path))
+    packages = SkillLoader().load(_REPO_ROOT / "skills", registry)
+    guardrails = GuardrailChain(settings, packages) if settings.guardrails_enabled else None
     runtime = ReActRuntime(
         LLMClient(settings),
         registry,

@@ -13,9 +13,9 @@
 
 Sluice is a business-agnostic agent runtime for data work. It is not a single agent — it is a platform: mount a Skill package (`SKILL.md` + `tools.py` + `evals/`), and you immediately get a ReAct loop wrapped by guardrails at four interception points (before each tool call, during the loop, before delivery, and at recovery), an LLM-as-judge eval gate that rejects scores not backed by verbatim quotes from the output, audit logging for every run, a zero-official-SDK MCP client for the tool ecosystem, and FAISS-backed long-term memory.
 
-We self-built the harness deliberately. The production-critical control points — where to intercept a hallucinated tool call, how to classify and recover from LLM failures, how to gate quality with deterministic plus judge-layer evals — are exactly the parts that general frameworks keep inside their black box. In Sluice, all of them are ~600-line modules you can read end to end.
+We self-built the harness deliberately. The production-critical control points — where to intercept a hallucinated tool call, how to classify and recover from LLM failures, how to gate quality with deterministic plus judge-layer evals — are exactly the parts that general frameworks keep inside their black box. In Sluice, all of them live in small single-file modules — the largest is ~330 lines — that you can read end to end.
 
-The LLM layer is httpx straight to any Anthropic-Messages-compatible gateway — no official SDK, function calling implemented by hand. Evals run in three layers (artifact / behavior / gate), and the whole suite passes without any API key.
+The LLM layer is httpx straight to any Anthropic-Messages-compatible gateway — no official SDK, function calling implemented by hand. Evals run in three layers (outcome / behavior / guardrail), and the whole suite passes without any API key.
 
 ## 概览
 
@@ -70,8 +70,23 @@ sluice web
 sluice eval --all
 
 # MCP 工具生态：列出工具 / 调用指定工具
+# 前提：仓库根有 .mcp.json（sluice mcp 直接读该文件）；Web 运行时接入 MCP 工具还需 .env 设 SLUICE_MCP_ENABLED=true
 sluice mcp
 sluice mcp --call <tool_name> --args '{}'
+```
+
+`.mcp.json` 形状示例（stdio server；仓库自带一个最小 echo server `tests/fixtures/mini_mcp_server.py`，照此配置即可 `sluice mcp --call mcp__echo__echo --args '{"text": "hi"}'`）：
+
+```json
+{
+  "mcpServers": {
+    "echo": {
+      "command": "python",
+      "args": ["tests/fixtures/mini_mcp_server.py"],
+      "timeout": 30
+    }
+  }
+}
 ```
 
 ## Architecture
@@ -147,6 +162,7 @@ graph TB
 ```
 skills/weekly-report/
 ├── SKILL.md        # frontmatter: name / description / output_contract（产出契约小节清单）+ 正文写死统计口径与使用流程
+├── config.yaml     # Skill 包配置
 ├── tools.py        # Skill 专属工具，函数名以 {skill}.{tool} 前缀注册进 ToolRegistry
 └── evals/
     └── cases.py    # 三层评测用例：产出断言 / 行为断言 / 门禁
@@ -160,7 +176,7 @@ skills/weekly-report/
 
 **alpha**。核心闭环、可靠性、评测、生态四层均已落地并有全量测试（273 tests）与 CI 门禁，API 仍可能变化。
 
-工程过程即文档：`docs/plans/` 保留 P0–P4 五个阶段的完整实现计划（含执行红线），可以完整复盘每层是怎么一步步建起来的。
+工程过程即文档：`docs/plans/` 保留 P0–P4 五个阶段的完整实现计划（含执行红线），另有 P5 发布收口计划，可以完整复盘每层是怎么一步步建起来的。
 
 ## License
 
