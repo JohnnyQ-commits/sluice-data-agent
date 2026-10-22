@@ -39,7 +39,7 @@ The LLM layer is httpx straight to any Anthropic-Messages-compatible gateway —
 - **零官方 LLM SDK**：httpx 直连任意 Anthropic-Messages 兼容网关，function calling 协议自实现
 - **零官方 SDK 的 MCP client**：protocol / transport / registry 三件套自实现，读 `.mcp.json` 接入工具生态
 - **长期记忆**：FAISS 本地向量检索，可选 Milvus 后端
-- **零 API key 可跑全量测试**：274 个测试，CI 持续验证
+- **零 API key 可跑全量测试**：275 个测试，CI 持续验证
 
 ## Why self-built (not LangChain)?
 
@@ -54,7 +54,7 @@ git clone https://github.com/JohnnyQ-commits/sluice-data-agent.git
 cd sluice-data-agent
 pip install -e ".[dev]"
 
-# 全量测试：274 passed，零 API key
+# 全量测试：275 passed，零 API key
 pytest tests/ -q
 
 # 配置 LLM 网关后解锁真实调用（Anthropic Messages 兼容端点均可）
@@ -174,7 +174,7 @@ skills/weekly-report/
 
 ## Status
 
-**alpha**。核心闭环、可靠性、评测、生态四层均已落地并有全量测试（274 tests）与 CI 门禁，API 仍可能变化。
+**alpha**。核心闭环、可靠性、评测、生态四层均已落地并有全量测试（275 tests）与 CI 门禁，API 仍可能变化。
 
 工程过程即文档：`docs/plans/` 保留 P0–P4 五个阶段的完整实现计划（含执行红线），另有 P5 发布收口计划，可以完整复盘每层是怎么一步步建起来的。
 
