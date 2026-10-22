@@ -1,6 +1,8 @@
 """会话记忆（时间维度）：user_id+session_id 隔离的轮次 JSONL 落盘。
 
 路径布局：<base>/<user_id>/<session_id>.jsonl；每行 {"ts", "role", "text"}。
+
+契约：调用方须保证 user_id/session_id 不含路径分隔符与 ".."（SessionStore 不做路径校验）。
 """
 
 from __future__ import annotations
