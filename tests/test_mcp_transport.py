@@ -75,6 +75,22 @@ def test_notify_does_not_block():
         t.close()
 
 
+def test_concurrent_requests_no_response_stealing():
+    """两线程并发 request——内部互斥串行化，响应不互偷（I-1 线程契约）。"""
+    import concurrent.futures
+
+    t = _transport()
+    try:
+        t.request("initialize", {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}})
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+            f1 = ex.submit(t.request, "tools/call", {"name": "add", "arguments": {"a": 1, "b": 2}})
+            f2 = ex.submit(t.request, "tools/call", {"name": "add", "arguments": {"a": 10, "b": 20}})
+            assert f1.result(timeout=10)["result"]["content"][0]["text"] == "3"
+            assert f2.result(timeout=10)["result"]["content"][0]["text"] == "30"
+    finally:
+        t.close()
+
+
 def test_timeout_raises_timeout_error():
     """对永不响应的进程请求 → 超时分类。"""
     sleeper = StdioTransport([sys.executable, "-c", "import sys,time\nfor l in sys.stdin: time.sleep(3600)"], timeout=1.0)
