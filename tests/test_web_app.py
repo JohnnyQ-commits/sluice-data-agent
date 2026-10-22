@@ -2,6 +2,8 @@ import json
 import threading
 from typing import ClassVar
 
+import faiss
+import numpy as np
 import pytest
 
 from sluice.config.settings import Settings
@@ -116,3 +118,62 @@ def test_skills_endpoint_lists_packages():
     resp = app.test_client().get("/api/skills")
     skills = resp.get_json()["skills"]
     assert isinstance(skills, list)
+
+
+def _memory_env_app(monkeypatch, tmp_path):
+    """memory_enabled 经 env 注入（create_app 内部 Settings() 走 BaseSettings 读 SLUICE_* 前缀 env）。"""
+    monkeypatch.setenv("SLUICE_MEMORY_ENABLED", "true")
+    monkeypatch.setenv("SLUICE_MEMORY_BASE_DIR", str(tmp_path))
+    fake = SlowFakeClient()
+    app = create_app(runtime=ReActRuntime(fake, ToolRegistry()), skills_dir=None)
+    app.config["TESTING"] = True
+    app.config["RELEASE"] = fake.release
+    return app
+
+
+def _read_stream(client, run_id):
+    body = client.get(f"/api/stream/{run_id}").get_data(as_text=True)
+    return [
+        json.loads(line[len("data: ") :])
+        for line in body.splitlines()
+        if line.startswith("data: ") and line[len("data: ") :] != "{}"
+    ], body
+
+
+def test_memory_init_failure_degrades_to_memoryless(monkeypatch, tmp_path):
+    """记忆层初始化失败（半写残留触发 ntotal 守卫）→ app 照常创建，对话照常交付。"""
+    index = faiss.IndexFlatIP(64)
+    index.add(np.zeros((3, 64), dtype="float32"))  # 索引 3 条 vs 元数据 2 条 → FaissStore 构造必炸
+    faiss.write_index(index, str(tmp_path / "vectors.faiss"))
+    (tmp_path / "vectors.meta.json").write_text(
+        json.dumps({"texts": ["a", "b"], "metas": [{}, {}]}), encoding="utf-8"
+    )
+    app = _memory_env_app(monkeypatch, tmp_path)
+    client = app.test_client()
+    resp = client.post("/api/chat", json={"message": "hi"})
+    assert resp.status_code == 200
+    run_id = resp.get_json()["run_id"]
+    app.config["RELEASE"].set()
+    events, body = _read_stream(client, run_id)
+    assert [e["type"] for e in events] == [
+        "round_start",
+        "tool_call",
+        "observation",
+        "round_start",
+        "final",
+    ]
+    assert events[-1]["answer"] == "完成"
+    assert "event: end" in body
+
+
+def test_memory_record_failure_does_not_break_response(monkeypatch, tmp_path):
+    """记忆落盘失败（sessions 目录位被文件占用 → append 必炸）→ chat 仍 200 且 final 正常。"""
+    (tmp_path / "sessions").write_text("", encoding="utf-8")
+    app = _memory_env_app(monkeypatch, tmp_path)
+    client = app.test_client()
+    resp = client.post("/api/chat", json={"message": "hi"})
+    assert resp.status_code == 200
+    run_id = resp.get_json()["run_id"]
+    app.config["RELEASE"].set()
+    events, _ = _read_stream(client, run_id)
+    assert events[-1] == {"type": "final", "answer": "完成"}

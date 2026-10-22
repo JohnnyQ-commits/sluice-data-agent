@@ -70,3 +70,11 @@ def test_recall_ignores_other_users(tmp_path):
     mem.record("u1", "s1", "assistant", "上升百分之十五")
     # 向量库是全局的，召回按 meta.user_id 隔离
     assert mem.recall("u2", "s1", "上周销售额环比上升多少") == ""
+
+
+def test_recall_filters_zero_lexical_overlap(tmp_path):
+    mem, _ = _memory(tmp_path, max_turns=1)
+    mem.record("u1", "s1", "user", "上周销售额环比上升多少")
+    mem.record("u1", "s1", "assistant", "上升百分之十五")
+    # 零词面重合 → HashEmbedder 内积 0 → hooks 的 score>0 过滤兜住，不把不相关摘要当命中
+    assert mem.recall("u1", "s1", "完全无关的话题") == ""

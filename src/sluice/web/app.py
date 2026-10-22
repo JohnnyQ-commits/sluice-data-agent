@@ -88,6 +88,8 @@ def create_app(client=None, registry=None, runtime=None, skills_dir="skills") ->
                 build_skill_store(vectors, packages)
                 built_marker.parent.mkdir(parents=True, exist_ok=True)
                 built_marker.touch()
+            elif built_marker.exists():
+                logger.info("skill 索引已存在，跳过重建（删除 %s 可强制）", built_marker)
 
             def _summarize(text: str) -> str:
                 resp = client.chat(
