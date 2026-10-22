@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-20 19:19:01",
+  "generated_at": "2026-10-22 11:41:42",
   "pass_rate": 1.0,
-  "judge_avg": null,
+  "judge_avg": 4.333333333333334,
   "results": [
     {
       "skill": "credit-weekly",
@@ -10,29 +10,29 @@
       "status": "pass",
       "detail": {
         "missing": [],
-        "answer_head": "上周的信贷业务周报已生成完毕，内容如下：\n\n---\n\n# 信贷业务周报\n\n**统计周期**：2026-10-12 ~ 2026-10-18（环比：2026-10-05 ~ 2026-10-11）\n\n## 核心指标\n\n- **贷款申请量**：153 件（环比 +15%）\n- **审批通过率**：66.01%（环比 -4.67pp）\n- **件均申请金额**：30.90 万元（环比 +23.2%）\n\n",
+        "answer_head": "# 信贷业务周报\n\n**统计周期**：2026-10-12 ~ 2026-10-18（自然周）\n\n## 核心指标\n\n| 指标 | 本周 | 环比变化 | 上上周参考值 |\n|---|---|---|---|\n| 贷款申请量 | 153 件 | 📈 +15.0% | 133 件 |\n| 审批通过率 | 66.0% | 📉 -4.7pp | 70.7% |\n| 件均申请金额 | 30.90 万元 | ",
         "judge_items": [
           {
             "item": "数值必须与 demo 库 credit_applications 表真实聚合一致（申请量/通过率/件均），不得编造",
-            "score": null,
-            "quote": "",
-            "valid": false
+            "score": 4,
+            "quote": "贷款申请量 153 件，环比上上周（133 件）增长 15.0%",
+            "valid": true
           },
           {
             "item": "通过率保留 1 位小数百分比；件均金额保留 2 位小数",
-            "score": null,
-            "quote": "",
-            "valid": false
+            "score": 5,
+            "quote": "| 审批通过率 | 66.0% | 📉 -4.7pp | 70.7% |\n| 件均申请金额 | 30.90 万元 | 📈 +23.2% | 25.08 万元 |",
+            "valid": true
           },
           {
             "item": "统计周期为自然周（周一~周日），禁止用 MAX(app_date) 锚点；覆盖不足时注明",
-            "score": null,
-            "quote": "",
-            "valid": false
+            "score": 5,
+            "quote": "**统计周期**：2026-10-12 ~ 2026-10-18（自然周）",
+            "valid": true
           }
         ],
-        "judge_avg": null,
-        "judge_valid": false
+        "judge_avg": 4.666666666666667,
+        "judge_valid": true
       },
       "known_issue": false
     },
@@ -43,6 +43,7 @@
       "status": "pass",
       "detail": {
         "used_tools": [
+          "credit-weekly.query_credit",
           "credit-weekly.query_credit"
         ],
         "expect_skill": "credit-weekly"
@@ -77,29 +78,29 @@
       "status": "pass",
       "detail": {
         "missing": [],
-        "answer_head": "上周的数据周报已生成完毕：\n\n# 销售数据周报\n\n**统计周期**：2026-10-12 ~ 2026-10-18\n\n## 核心指标\n\n| 指标 | 本周 | 环比 |\n|---|---|---|\n| 销售额（元） | 201,297.77 | +32.7% |\n| 订单量（单） | 359 | -0.6% |\n| 客单价（元/单） | 560.6 | +33.4% |\n| 第一大品类 | 服饰（",
+        "answer_head": "上周的数据周报已生成完毕：\n\n# 销售数据周报\n\n**统计周期**：2026-10-12 ~ 2026-10-18\n\n## 核心指标\n\n- **总销售额（元）**：201,297.77（环比 +32.7%）\n- **订单数（单）**：359（环比 -0.6%）\n- **平均客单价（元）**：560.61（环比 +33.4%）\n- **品类销售额 TOP1（服饰，元）**：57,369.95（环比 ",
         "judge_items": [
           {
             "item": "数值必须与 demo 库 sales 表真实聚合一致，不得编造",
-            "score": null,
-            "quote": "",
-            "valid": false
+            "score": 3,
+            "quote": "**平均客单价（元）**：560.61（环比 +33.4%）",
+            "valid": true
           },
           {
             "item": "环比计算正确：(本周值-上周值)/上周值，符号与百分比无误",
-            "score": null,
-            "quote": "",
-            "valid": false
+            "score": 4,
+            "quote": "销售额环比 +32.7%，主要由客单价提升驱动（客单价 +33.4%），订单量基本持平（-0.6%）",
+            "valid": true
           },
           {
             "item": "统计周期为自然周（周一~周日）；数据覆盖不足整周时注明实际覆盖范围",
-            "score": null,
-            "quote": "",
-            "valid": false
+            "score": 5,
+            "quote": "上周取数据中最近一个完整自然周（10-12 周一 ~ 10-18 周日），环比基准为上上周（10-05 ~ 10-11）",
+            "valid": true
           }
         ],
-        "judge_avg": null,
-        "judge_valid": false
+        "judge_avg": 4.0,
+        "judge_valid": true
       },
       "known_issue": false
     },
