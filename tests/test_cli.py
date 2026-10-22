@@ -1,3 +1,6 @@
+import io
+import sys
+
 import pytest
 
 from sluice.cli import main as cli_main
@@ -43,6 +46,27 @@ def test_run_executes_weekly_report_tool(monkeypatch, capsys, tmp_path):
     assert "weekly-report.query_sales" in out  # Skill 工具进了 registry
     assert "错误" not in out  # demo 库真实查询成功，非工具未找到的报错观测
     assert "周报正文" in out  # 循环正常收尾
+
+
+def test_main_reconfigures_gbk_console(monkeypatch, tmp_path):
+    """GBK 控制台下 eval 报告的 emoji 旗标不炸 CLI（errors=replace 降级而非崩）。
+
+    实录：_print_report 的 ✅⏭💥 在 GBK stdout 抛 UnicodeEncodeError，未捕获
+    traceback 且全过仍 exit 1。main() 入口统一 reconfigure(errors="replace")。
+    测试把 stdout 换成 GBK TextIOWrapper 走真实 main(["eval", "--all", "--skip-judge"])，
+    无修复时此用例以 UnicodeEncodeError（而非 SystemExit）失败。
+    零 API key：不设 key 时 run_eval 只跑确定性 guardrail 层（behavior/outcome skipped），
+    报告照常打印——若设了 key 会构造真实 LLMClient 打网关，测试即挂起。
+    """
+    buf = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(buf, encoding="gbk", newline=""))
+    monkeypatch.delenv("SLUICE_LLM_API_KEY", raising=False)
+    monkeypatch.setenv("SLUICE_DEMO_DB_PATH", str(cli_main._REPO_ROOT / "data" / "demo.db"))
+    monkeypatch.setenv("SLUICE_AUDIT_DIR", str(tmp_path / "audit"))
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as exc_info:
+        cli_main.main(["eval", "--all", "--skip-judge"])
+    assert exc_info.value.code == 0
 
 
 def test_main_help():

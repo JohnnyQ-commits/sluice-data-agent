@@ -50,12 +50,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-judge", action="store_true", help="跳过 LLM-as-judge（只跑确定性断言）"
     )
     mcp_p = sub.add_parser("mcp", help="MCP 工具发现与调用演示（读 .mcp.json）")
-    mcp_p.add_argument("--call", metavar="TOOL", help="调用指定工具（如 mcp__mini__echo）")
+    mcp_p.add_argument("--call", metavar="TOOL", help="调用指定工具（如 mcp__echo__echo）")
     mcp_p.add_argument("--args", metavar="JSON", default="{}", help="工具参数 JSON")
     return parser
 
 
 def main(argv: list[str] | None = None) -> None:
+    # GBK 控制台兼容：eval 报告的 emoji 旗标（✅⏭💥）在 GBK stdout 抛 UnicodeEncodeError
+    # 且未捕获 traceback、全过仍 exit 1——入口统一降级为替换符，中文等 GBK 可编码字符不受影响
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     args = build_parser().parse_args(argv)
     if args.command == "run":
         _run(args.message)
