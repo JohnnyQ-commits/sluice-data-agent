@@ -22,9 +22,10 @@ class FakeMilvusClient:
     def has_collection(self, name: str) -> bool:
         return name in self.created
 
-    def create_collection(self, name: str, dimension: int, metric_type: str = "IP"):
+    def create_collection(self, name: str, dimension: int, metric_type: str = "IP", id_type: str = "int"):
         self.created.append(name)
         self.dimension = dimension
+        self.id_type = id_type
 
     def insert(self, collection: str, rows: list[dict]) -> None:
         self.rows.extend(rows)
@@ -67,6 +68,7 @@ def test_milvus_store_creates_collection_once():
     MilvusStore(collection="t", dim=64, embed=HashEmbedder(64), client=fake)
     MilvusStore(collection="t", dim=64, embed=HashEmbedder(64), client=fake)
     assert fake.created == ["t"]  # 第二次不重复建表
+    assert fake.id_type == "string"  # 字符串主键与 upsert 的 uuid4 主键匹配（真客户端 int 默认会类型不匹配）
 
 
 def test_milvus_store_missing_pymilvus_raises_clean(monkeypatch):

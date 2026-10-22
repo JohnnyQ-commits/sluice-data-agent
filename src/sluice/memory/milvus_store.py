@@ -27,7 +27,7 @@ class MilvusStore:
             client = MilvusClient()  # 连接参数走环境默认（本地演示）或 MILVUS_URI
         self._client = client
         if not client.has_collection(collection):
-            client.create_collection(collection, dimension=dim, metric_type="IP")
+            client.create_collection(collection, dimension=dim, metric_type="IP", id_type="string")
 
     def upsert(self, texts: list[str], metas: list[dict] | None = None) -> None:
         if not texts:
