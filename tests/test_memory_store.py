@@ -20,7 +20,7 @@ def test_hash_embedder_deterministic():
 def test_faiss_store_upsert_and_search(tmp_path):
     store = FaissStore(embed=HashEmbedder(dim=64), dim=64, path=str(tmp_path / "v"))
     store.upsert(
-        ["上周销售额环比上升", "杭州连续三周居首", "信贷通过率下降"],
+        ["上周销售额环比上升", "杭州连续三周居首", "用户活跃度下降"],
         metas=[{"src": "a"}, {"src": "b"}, {"src": "c"}],
     )
     # 查询与第一条文本完全相同：HashEmbedder 按空白切分，连续中文整句是单 token，

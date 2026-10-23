@@ -7,7 +7,7 @@
 [![CI](https://github.com/JohnnyQ-commits/sluice-data-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/JohnnyQ-commits/sluice-data-agent/actions/workflows/ci.yml)
 [![Python](https://shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-279%20passed-brightgreen)](#快速体验)
+[![Tests](https://img.shields.io/badge/tests-280%20passed-brightgreen)](#快速体验)
 
 **[快速体验 ↓](#快速体验)** &nbsp;·&nbsp; **[架构](#架构)** &nbsp;·&nbsp; **[Skill 包协议](#skill-包协议)** &nbsp;·&nbsp; **[与同类项目的差异](#与同类项目的差异)**
 
@@ -68,7 +68,7 @@ pip install -e ".[dev]"
 ```bash
 python scripts/demo_guardrails.py    # 上面展示的三幕演示
 sluice eval --all --skip-judge       # 三层评测跑一遍
-pytest tests/ -q                     # 279 个测试全部零 key 可跑
+pytest tests/ -q                     # 280 个测试全部零 key 可跑
 ```
 
 **第二档：配置 LLM 解锁完整体验**（任意 Anthropic Messages 兼容端点）：
@@ -92,7 +92,7 @@ sluice eval --all                    # 完整评测含 judge 打分
 - **零官方 LLM SDK** —— httpx 直连网关，function calling 手写实现，行为完全可读
 - **零官方 SDK 的 MCP client** —— protocol / transport / registry 三件套自实现（见[下文](#mcp-生态)）
 - **长期记忆** —— FAISS 本地向量检索，可选 Milvus 后端，默认关闭零行为变化
-- **零 API key 全量测试** —— 279 个测试，CI 持续验证
+- **零 API key 全量测试** —— 280 个测试，CI 持续验证
 
 ## 架构
 
@@ -137,7 +137,7 @@ flowchart TB
 |------|------|
 | `llm/` | httpx 直连 Anthropic Messages 兼容网关，超时重试与 function calling 自实现 |
 | `tools/` | 原子工具与注册表（SQLite 查询等），Skill 工具与 MCP 工具共用一个 registry |
-| `skills/` | Skill 包加载器 + 两个内置示例（`weekly-report`、`credit-weekly`） |
+| `skills/` | Skill 包加载器 + 两个内置示例（`weekly-report`、`user-activity`） |
 | `runtime/` | ReAct 循环发动机：多轮思考→行动→观察、轨迹记录、异常分类与自修恢复 |
 | `guardrails/` | 四拦截点编排：输入门禁（幻觉工具/非法参数/越权表）、行为门禁（重复调用/预算）、输出门禁（契约校验）、自修恢复 |
 | `evals/` | 三层执行器（门禁剧本 / 单轮行为 / 端到端产出）+ judge + 基线门禁 |
@@ -220,7 +220,7 @@ sluice mcp --call mcp__filesystem__read_file --args '{"path": "langgraph_weekly/
 
 ## Status
 
-**alpha**。核心闭环、可靠性、评测、生态四层均已落地并有全量测试（279 tests）与 CI 门禁，API 仍可能变化。
+**alpha**。核心闭环、可靠性、评测、生态四层均已落地并有全量测试（280 tests）与 CI 门禁，API 仍可能变化。
 
 工程过程即文档：`docs/plans/` 保留 P0–P5 六个阶段的完整实现计划（含执行红线），可以完整复盘每一层是怎么一步步建起来的。
 

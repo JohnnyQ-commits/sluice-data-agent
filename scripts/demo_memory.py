@@ -21,7 +21,7 @@ def main() -> None:
     for role, text in [
         ("user", "查一下上周销售额环比"),
         ("assistant", "上周销售额环比上升 15%"),
-        ("user", "好的，再看信贷通过率"),
+        ("user", "好的，再看用户活跃度"),
     ]:
         memory.record("demo", "s1", role, text)
 

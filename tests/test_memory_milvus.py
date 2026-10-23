@@ -52,7 +52,7 @@ def test_milvus_store_same_interface_as_faiss(tmp_path):
     fake = FakeMilvusClient()
     milvus = MilvusStore(collection="t", dim=64, embed=embed, client=fake)
     faiss = FaissStore(embed=embed, dim=64, path=str(tmp_path / "v"))
-    texts = ["上周销售额环比上升", "杭州连续三周居首", "信贷通过率下降"]
+    texts = ["上周销售额环比上升", "杭州连续三周居首", "用户活跃度下降"]
     metas = [{"src": "a"}, {"src": "b"}, {"src": "c"}]
     milvus.upsert(texts, metas)
     faiss.upsert(texts, metas)

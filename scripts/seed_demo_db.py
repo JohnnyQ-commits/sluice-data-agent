@@ -5,6 +5,8 @@
 
 import random
 import sqlite3
+from datetime import date as _date
+from datetime import timedelta
 from pathlib import Path
 
 DB = Path(__file__).resolve().parent.parent / "data" / "demo.db"
@@ -35,39 +37,51 @@ for day in range(1, 22):
                 rows.append((date, city, cat, round(random.uniform(20, 800) * bump, 2)))
 conn.executemany("insert into sales (sale_date, city, category, amount) values (?, ?, ?, ?)", rows)
 
-PRODUCTS = ["消费贷", "经营贷", "房贷"]
-
-conn.execute("drop table if exists credit_applications")
+conn.execute("drop table if exists user_events")
 conn.execute(
-    """create table credit_applications (
+    """create table user_events (
         id integer primary key,
-        app_date text not null,
-        city text not null,
-        product text not null,
-        apply_amount real not null,
-        approved integer not null
+        user_id text not null,
+        event_date text not null,
+        event_type text not null
     )"""
 )
-random.seed(43)
-credit_rows = []
-for day in range(1, 22):
-    date = f"2026-10-{day:02d}"
-    bump = 1.5 if day >= 15 else 1.0
-    for city in CITIES:
-        for _ in range(random.randint(2, 6)):
-            credit_rows.append(
-                (
-                    date,
-                    city,
-                    random.choice(PRODUCTS),
-                    round(random.uniform(5_000, 500_000) * bump, 2),
-                    1 if random.random() < 0.68 else 0,
-                )
-            )
+random.seed(44)
+# 近 30 天用户事件：几百用户，日活整体上行 + 周末回落，新增用户每日零星进入
+START = _date(2026, 9, 24)
+DAYS = 30
+event_rows = []
+user_first: dict[str, str] = {}
+uid_counter = 0
+
+
+def _new_user(first_day: str) -> str:
+    global uid_counter
+    uid_counter += 1
+    uid = f"u{uid_counter:03d}"
+    user_first[uid] = first_day
+    return uid
+
+
+active: list[str] = [_new_user(START.isoformat()) for _ in range(180)]  # 首日存量用户
+for offset in range(DAYS):
+    d = (START + timedelta(days=offset)).isoformat()
+    # 每日新增 3~8 个用户，且首日必留下 login 事件（保证"当日首次出现"口径可聚合）
+    newcomers = [_new_user(d) for _ in range(random.randint(3, 8))]
+    for uid in newcomers:
+        event_rows.append((uid, d, "login"))
+    weekend = 0.6 if (START + timedelta(days=offset)).weekday() >= 5 else 1.0
+    trend = 0.8 + 0.4 * offset / (DAYS - 1)  # 日活从偏冷缓慢走高
+    for uid in active:
+        if random.random() < 0.62 * weekend * trend:
+            event_rows.append((uid, d, "login"))
+            for _ in range(random.randint(0, 3)):
+                event_rows.append((uid, d, random.choice(["view", "action"])))
+    active.extend(newcomers)
 conn.executemany(
-    "insert into credit_applications (app_date, city, product, apply_amount, approved) values (?, ?, ?, ?, ?)",
-    credit_rows,
+    "insert into user_events (user_id, event_date, event_type) values (?, ?, ?)",
+    event_rows,
 )
 conn.commit()
 conn.close()
-print(f"seeded {DB} with sales={len(rows)} credit={len(credit_rows)} rows")
+print(f"seeded {DB} with sales={len(rows)} user_events={len(event_rows)} rows")

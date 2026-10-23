@@ -22,9 +22,10 @@ def test_build_system_with_packages_contains_prefix_steering():
 
 def test_build_system_steering_no_hardcoded_tool_names():
     """引导句不得硬编码具体 Skill/工具名——平台代码与具体 skill 解耦。"""
-    text = build_system([_pkg("weekly-report"), _pkg("credit-weekly")])
+    text = build_system([_pkg("weekly-report"), _pkg("user-activity")])
     assert "query_data" not in text
-    assert "query_credit" not in text
+    assert "query_sales" not in text
+    assert "query_events" not in text
     assert "render_report" not in text
 
 
