@@ -1,24 +1,55 @@
+<div align="center">
+
 # Sluice
 
-**可挂载 Skill 的数据 Agent 平台——AI 帮你查数出报告，且它的产出你敢信**
+**可挂载 Skill 的数据 Agent 平台 —— AI 帮你查数出报告，且它的产出你敢信**
 
 [![CI](https://github.com/JohnnyQ-commits/sluice-data-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/JohnnyQ-commits/sluice-data-agent/actions/workflows/ci.yml)
 [![Python](https://shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Status](https://img.shields.io/badge/status-alpha-orange)](#status)
+[![Tests](https://img.shields.io/badge/tests-279%20passed-brightgreen)](#快速体验)
+
+**[快速体验 ↓](#快速体验)** &nbsp;·&nbsp; **[架构](#架构)** &nbsp;·&nbsp; **[Skill 包协议](#skill-包协议)** &nbsp;·&nbsp; **[与同类项目的差异](#与同类项目的差异)**
+
+</div>
+
+---
+
+## 一分钟看到它工作
+
+用一句自然语言提数据需求，AI Agent 自己规划步骤、生成 SQL、查数据库、产出格式完整的报告。而当 AI 犯错时——引用不存在的表、陷入重复调用、报告缺章节——门禁当场拦截并引导自纠：
+
+```text
+$ python scripts/demo_guardrails.py        # 零 API key，clone 即可运行
+
+--- 第一幕：幻觉工具拦截 ---
+[模型]   调用 ghost_tool（一个不存在于注册表的工具）
+[输入门禁] ✗ 拦截：工具 ghost_tool 不在注册表中（幻觉工具），调用被拦截
+[模型]   收到，改用注册表内的工具...
+
+--- 第二幕：重复调用打断 ---
+[模型]   调用 demo.report → done
+[模型]   再次调用 demo.report
+[行为门禁] ✗ 打断：检测到与上一轮完全相同的重复调用，请换方法推进或直接给出最终回答
+
+--- 第三幕：产出契约自修 ---
+[输出门禁] ✗ 最终回答缺少必需小节: 核心指标、重点发现
+[自修恢复] ✓ 定向自修通过，补齐契约后重新交付
+[最终]   ## 核心指标  总申请量 1,234 件  ## 重点发现  通过率环比上升
+
+--- 审计落盘 --- audit/audit.jsonl
+```
+
+以上是门禁层的确定性演示（不调用大模型）。配置 LLM 后解锁完整链路：`sluice run "生成本周销售周报"` → Agent 真查 demo 库、流式输出带真实数字的周报；Web 界面里还能看到轨迹逐轮滚动、拦截以琥珀色卡片呈现。
 
 ## 这是什么
 
-你用一句自然语言提出数据需求，AI Agent 自己规划步骤、生成 SQL、查数据库、产出格式完整的报告：
+**Sluice 是一个数据 Agent 运行时（harness）。** 它干两件事：
 
-```bash
-sluice run "生成本周销售周报"
-# Agent 轨迹：理解需求 → 生成 SQL → 查 demo 库 → 流式输出带真实数字的周报
-```
+1. **让 Agent 干活**：ReAct 循环 + 工具生态（内置 SQLite 查询、可接 MCP server）+ 本地 Web 界面。业务以 Skill 包形式挂载——数据周报是第一个乘客，写一个三件套（`SKILL.md` + `tools.py` + `evals/`）就能挂载新场景，平台能力（门禁、评测、审计、记忆）全部自动生效
+2. **让产出可信**：AI 查数产品的通病是"一本正经地胡说"。Sluice 在循环四个位置埋门禁（工具调用前 / 循环中 / 交付前 / 恢复），评测层用 LLM-as-judge 且**每个评分必须引用产出原文逐字佐证**，基线门禁守住质量不回退，审计 JSONL 留痕每一次拦截与自修
 
-这类"AI 查数"的 demo 满街都是，Sluice 解决的是它们普遍的死穴：**AI 会一本正经地胡说**——引用不存在的表、数字来源不明、陷入重复调用。Sluice 在 Agent 循环的四个位置埋了门禁，错误尝试被当场拦下并回喂给模型自纠；每个 Skill 自带评测用例与基线门禁，质量回退在 CI 就被拦住；全程审计留痕，每一次拦截与自修都可复查。
-
-它同时是一个**平台**而不是单个 Agent：数据周报只是挂载的第一个 Skill 包。写一个满足[包协议](#skill-包协议)的三件套（`SKILL.md` + `tools.py` + `evals/`），就能挂载一个新业务场景，获得平台全部能力——门禁、评测、审计、记忆、工具生态。仓库内置两个示例 Skill（销售周报、信贷周报），后者与前者共享同一个运行时，仅是多挂了一个包。
+能力是"会调 API"，可信是工程问题——Sluice 做的是后者。
 
 ## 快速体验
 
@@ -28,39 +59,36 @@ cd sluice-data-agent
 pip install -e ".[dev]"
 ```
 
-**第一档：不需要任何 API key，clone 即验**——演示的是门禁层（确定性代码，不调用大模型）：
+**第一档：不需要任何 API key**（演示门禁层与评测层，全为确定性代码）：
 
 ```bash
-# 三幕演示：幻觉表拦截 → 重复调用打断 → 产出契约自修，30 秒看到门禁真实工作
-python scripts/demo_guardrails.py
-
-# 评测三层跑一遍（确定性层全过，279 个测试同理零 key 可跑）
-sluice eval --all --skip-judge
-pytest tests/ -q
+python scripts/demo_guardrails.py    # 上面展示的三幕演示
+sluice eval --all --skip-judge       # 三层评测跑一遍
+pytest tests/ -q                     # 279 个测试全部零 key 可跑
 ```
 
-**第二档：配置 LLM 后解锁完整体验**——Agent 真查库、真出报告（任意 Anthropic Messages 兼容端点）：
+**第二档：配置 LLM 解锁完整体验**（任意 Anthropic Messages 兼容端点）：
 
 ```bash
-cp .env.example .env   # 填 SLUICE_LLM_BASE_URL / SLUICE_LLM_API_KEY / SLUICE_LLM_MODEL
+cp .env.example .env                 # 填 SLUICE_LLM_BASE_URL / SLUICE_LLM_API_KEY / SLUICE_LLM_MODEL
 
-sluice run "生成本周销售周报"   # 单次指令，终端看完整 ReAct 轨迹
-sluice web                      # 本地 Web 界面（Flask + SSE），轨迹流式滚动 + 拦截卡片
-sluice eval --all               # 完整评测含 LLM-as-judge 打分
+sluice run "生成本周销售周报"         # 终端看完整 ReAct 轨迹
+sluice web                           # 本地 Web 界面（Flask + SSE）
+sluice eval --all                    # 完整评测含 judge 打分
 ```
 
-界面上值得试的一手：故意问一个**不存在的表**（如"查一下 user_behavior 表近 7 天活跃用户"），你会看到 AI 的错误尝试被琥珀色拦截卡片当场接住，随后靠拦截反馈自纠、改用真表出数。
+> 界面上值得试的一手：故意问一个**不存在的表**（如"查一下 user_behavior 表近 7 天活跃用户"），看 AI 的错误尝试被琥珀色卡片当场接住，随后靠拦截反馈自纠、改用真表出数。
 
 ## 核心特性
 
-- **ReAct 循环 + 四拦截点**：工具调用前 / 循环运行中 / 产出交付前 / 恢复策略，门禁全部内建于发动机；`guardrails=None` 一键回到裸循环
-- **Skill 包协议**：三件套挂载即获得评测与门禁，业务无关运行时
-- **LLM-as-judge 防作弊**：judge 每项评分必须引用产出原文逐字佐证，引用比对不过则判分无效——评测工具本身也不可被骗
-- **基线回归门禁**：`sluice eval --baseline` 对比基线，通过率或 judge 均分下降即失败，消失的 Skill 显式报错
-- **零官方 LLM SDK**：httpx 直连网关，function calling 协议手写实现，行为完全可读
-- **零官方 SDK 的 MCP client**：protocol / transport / registry 三件套自实现，读 `.mcp.json` 接入任意 MCP server（详见[下文](#mcp-生态)）
-- **长期记忆**：FAISS 本地向量检索，可选 Milvus 后端，默认关闭零行为变化
-- **零 API key 全量测试**：279 个测试，CI 持续验证
+- **ReAct 循环 + 四拦截点** —— 工具调用前 / 循环运行中 / 产出交付前 / 恢复策略，门禁内建于发动机；`guardrails=None` 一键回到裸循环
+- **Skill 包协议** —— 三件套挂载即获得评测与门禁，业务无关运行时
+- **LLM-as-judge 防作弊** —— 评分必须逐字引用产出原文，引用比对不过判分无效：评测工具本身也不可被骗
+- **基线回归门禁** —— 通过率或 judge 均分对比基线下降即失败，消失的 Skill 显式报错
+- **零官方 LLM SDK** —— httpx 直连网关，function calling 手写实现，行为完全可读
+- **零官方 SDK 的 MCP client** —— protocol / transport / registry 三件套自实现（见[下文](#mcp-生态)）
+- **长期记忆** —— FAISS 本地向量检索，可选 Milvus 后端，默认关闭零行为变化
+- **零 API key 全量测试** —— 279 个测试，CI 持续验证
 
 ## 架构
 
@@ -101,8 +129,6 @@ flowchart TB
     E1 --> E2 --> E3
 ```
 
-各模块一句话职责：
-
 | 模块 | 职责 |
 |------|------|
 | `llm/` | httpx 直连 Anthropic Messages 兼容网关，超时重试与 function calling 自实现 |
@@ -114,6 +140,19 @@ flowchart TB
 | `mcp/` | 零官方 SDK 的 MCP client 三件套，读 `.mcp.json` 发现并调用外部工具 |
 | `memory/` | 会话记忆与长期记忆（FAISS 本地检索，可选 Milvus），默认关闭 |
 | `web/` / `cli/` | Flask + SSE 的本地界面；`run` / `web` / `eval` / `mcp` 四个子命令 |
+
+## 与同类项目的差异
+
+[WrenAI](https://github.com/Canner/WrenAI)、[DB-GPT](https://github.com/eosphoros-ai/DB-GPT)、[Vanna](https://github.com/vanna-ai/vanna) 是数据 Agent 领域的头部开源项目——它们做的是**面向最终用户的 BI 产品 / Text-to-SQL 引擎**（语义层、仪表盘、图表、多数据源接入）。Sluice 与它们不竞争，处在不同的层：
+
+| | WrenAI / DB-GPT / Vanna | Sluice |
+|---|---|---|
+| 定位 | GenBI 产品与 Text-to-SQL 引擎 | Agent 运行时（harness） |
+| 回答的问题 | "怎么把问题变成 SQL" | "SQL 变错了怎么兜住" |
+| 核心资产 | 语义层 / 可视化 / 连接器 | 四拦截点门禁 / 防作弊评测 / 审计 |
+| 使用方式 | 部署即用的应用 | 挂载 Skill 包的运行时，业务可替换 |
+
+一句话：**它们让 Agent 更能干，Sluice 让 Agent 的产出值得信任**——两者可以组合（例如给某个问数引擎配上 Sluice 的门禁与评测层）。
 
 ## Skill 包协议
 
