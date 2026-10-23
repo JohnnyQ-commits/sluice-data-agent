@@ -1,58 +1,58 @@
 {
-  "generated_at": "2026-10-22 11:41:42",
+  "generated_at": "2026-10-23 18:40:01",
   "pass_rate": 1.0,
-  "judge_avg": 4.333333333333334,
+  "judge_avg": 4.666666666666666,
   "results": [
     {
-      "skill": "credit-weekly",
-      "case": "credit_positive",
+      "skill": "user-activity",
+      "case": "user_activity_positive",
       "layer": "outcome",
       "status": "pass",
       "detail": {
         "missing": [],
-        "answer_head": "# 信贷业务周报\n\n**统计周期**：2026-10-12 ~ 2026-10-18（自然周）\n\n## 核心指标\n\n| 指标 | 本周 | 环比变化 | 上上周参考值 |\n|---|---|---|---|\n| 贷款申请量 | 153 件 | 📈 +15.0% | 133 件 |\n| 审批通过率 | 66.0% | 📉 -4.7pp | 70.7% |\n| 件均申请金额 | 30.90 万元 | ",
+        "answer_head": "# 用户活跃周报\n\n**统计周期**：2026-10-12 ~ 2026-10-18\n\n## 核心指标\n\n| 指标 | 数值 | 环比变化 |\n|---|---|---|\n| 周活跃用户数（WAU） | 311 | +16.5%（267 → 311） |\n| 新增用户数 | 44 | +37.5%（32 → 44） |\n| 日均 DAU | 174 | — |\n| DAU 峰值 | 205（周五 ",
         "judge_items": [
           {
-            "item": "数值必须与 demo 库 credit_applications 表真实聚合一致（申请量/通过率/件均），不得编造",
+            "item": "数值必须与 demo 库 user_events 表真实聚合一致（日均 DAU/周新增用户数/周环比），不得编造",
             "score": 4,
-            "quote": "贷款申请量 153 件，环比上上周（133 件）增长 15.0%",
+            "quote": "| 周活跃用户数（WAU） | 311 | +16.5%（267 → 311） |",
             "valid": true
           },
           {
-            "item": "通过率保留 1 位小数百分比；件均金额保留 2 位小数",
-            "score": 5,
-            "quote": "| 审批通过率 | 66.0% | 📉 -4.7pp | 70.7% |\n| 件均申请金额 | 30.90 万元 | 📈 +23.2% | 25.08 万元 |",
+            "item": "DAU 口径为当日去重 login 用户数，新增口径为当日首次出现用户数；环比与日均 DAU 保留 1 位小数",
+            "score": 4,
+            "quote": "| 日均 DAU | 174 | — |",
             "valid": true
           },
           {
-            "item": "统计周期为自然周（周一~周日），禁止用 MAX(app_date) 锚点；覆盖不足时注明",
+            "item": "统计周期为自然周（周一~周日），禁止用 MAX(event_date) 锚点；覆盖不足时注明",
             "score": 5,
-            "quote": "**统计周期**：2026-10-12 ~ 2026-10-18（自然周）",
+            "quote": "**统计周期**：2026-10-12 ~ 2026-10-18",
             "valid": true
           }
         ],
-        "judge_avg": 4.666666666666667,
+        "judge_avg": 4.333333333333333,
         "judge_valid": true
       },
       "known_issue": false
     },
     {
-      "skill": "credit-weekly",
-      "case": "credit_intent_route",
+      "skill": "user-activity",
+      "case": "user_activity_intent_route",
       "layer": "behavior",
       "status": "pass",
       "detail": {
         "used_tools": [
-          "credit-weekly.query_credit",
-          "credit-weekly.query_credit"
+          "user-activity.query_events",
+          "user-activity.query_events"
         ],
-        "expect_skill": "credit-weekly"
+        "expect_skill": "user-activity"
       },
       "known_issue": false
     },
     {
-      "skill": "credit-weekly",
-      "case": "credit_cross_domain_blocked",
+      "skill": "user-activity",
+      "case": "user_activity_cross_domain_blocked",
       "layer": "guardrail",
       "status": "pass",
       "detail": {
@@ -78,28 +78,28 @@
       "status": "pass",
       "detail": {
         "missing": [],
-        "answer_head": "上周的数据周报已生成完毕：\n\n# 销售数据周报\n\n**统计周期**：2026-10-12 ~ 2026-10-18\n\n## 核心指标\n\n- **总销售额（元）**：201,297.77（环比 +32.7%）\n- **订单数（单）**：359（环比 -0.6%）\n- **平均客单价（元）**：560.61（环比 +33.4%）\n- **品类销售额 TOP1（服饰，元）**：57,369.95（环比 ",
+        "answer_head": "上周数据周报已生成完毕：\n\n# 数据周报\n\n**统计周期**：2026-10-12 ~ 2026-10-18\n\n## 核心指标\n\n| 指标 | 本周 | 环比 |\n|---|---|---|\n| 总销售额 (元) | 201,297.77 | **+32.7%** 📈 |\n| 订单数 | 359 | -0.6% |\n| 平均客单价 (元) | 560.72 | **+33.4%** 📈 |\n\n##",
         "judge_items": [
           {
             "item": "数值必须与 demo 库 sales 表真实聚合一致，不得编造",
-            "score": 3,
-            "quote": "**平均客单价（元）**：560.61（环比 +33.4%）",
+            "score": 5,
+            "quote": "销售额 57,369.95 元（96 单），食品（51,408.45 元）、数码（47,136.84 元）、家居（45,382.53 元）依次紧随",
             "valid": true
           },
           {
             "item": "环比计算正确：(本周值-上周值)/上周值，符号与百分比无误",
-            "score": 4,
-            "quote": "销售额环比 +32.7%，主要由客单价提升驱动（客单价 +33.4%），订单量基本持平（-0.6%）",
+            "score": 5,
+            "quote": "| 总销售额 (元) | 201,297.77 | **+32.7%** 📈 |",
             "valid": true
           },
           {
             "item": "统计周期为自然周（周一~周日）；数据覆盖不足整周时注明实际覆盖范围",
             "score": 5,
-            "quote": "上周取数据中最近一个完整自然周（10-12 周一 ~ 10-18 周日），环比基准为上上周（10-05 ~ 10-11）",
+            "quote": "**统计周期**：2026-10-12 ~ 2026-10-18",
             "valid": true
           }
         ],
-        "judge_avg": 4.0,
+        "judge_avg": 5.0,
         "judge_valid": true
       },
       "known_issue": false
@@ -111,7 +111,6 @@
       "status": "pass",
       "detail": {
         "used_tools": [
-          "weekly-report.query_sales",
           "weekly-report.query_sales"
         ],
         "expect_skill": "weekly-report"
