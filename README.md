@@ -11,6 +11,10 @@
 
 **[快速体验 ↓](#快速体验)** &nbsp;·&nbsp; **[架构](#架构)** &nbsp;·&nbsp; **[Skill 包协议](#skill-包协议)** &nbsp;·&nbsp; **[与同类项目的差异](#与同类项目的差异)**
 
+<img src="docs/images/web-weekly-report.png" width="820" alt="Sluice Web 界面：生成本周销售周报的真实 Agent 轨迹——多轮 SQL 探查，第一轮出错观察以红色呈现，模型依据反馈自纠" />
+
+*Web 界面实录：`sluice run "生成本周销售周报"` 的真实轨迹——第 1 轮 SQL 出错（红色观察），模型依据反馈调整口径，第 3 轮起产出正确的统计查询。*
+
 </div>
 
 ---
