@@ -254,3 +254,87 @@ def test_session_init_persisted_in_turn(conv_app):
     assert events[0]["type"] == "session_init"
     assert events[0]["max_rounds"] == 10
     assert isinstance(events[0]["tools"], list)
+
+
+# ---------------- 指定 skill 注入（/api/chat 可选 skill 字段） ----------------
+
+
+class SystemCaptureClient:
+    """记录每次 run 传入的 system，验证指定 skill 的直接注入与缺省行为。"""
+
+    def __init__(self):
+        self.systems = []
+
+    def chat(self, messages, system=None, tools=None):
+        self.systems.append(system)
+        return LLMResponse(content=[TextBlock("完成")], stop_reason="end_turn", usage={})
+
+
+def _skill_app(tmp_path, capture):
+    skills_root = tmp_path / "skills"
+    for name, desc in (("demo-skill", "演示技能唯一标记"), ("other-skill", "其他技能标记")):
+        d = skills_root / name
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text(
+            f"---\nname: {name}\ndescription: {desc}\noutput_contract: 结论\n---\n# t\n",
+            encoding="utf-8",
+        )
+    app = create_app(
+        runtime=ReActRuntime(capture, ToolRegistry()),
+        skills_dir=str(skills_root),
+        conversations_dir=tmp_path / "convs",
+    )
+    app.config["TESTING"] = True
+    return app
+
+
+def test_chat_with_skill_param_injects_direct_system(tmp_path):
+    """指定 skill：跳过语义匹配直接注入该 skill 的 system，session_init 记录选择。"""
+    capture = SystemCaptureClient()
+    app = _skill_app(tmp_path, capture)
+    client = app.test_client()
+    resp = client.post("/api/chat", json={"message": "你好", "skill": "demo-skill"})
+    _finish(client, resp.get_json()["run_id"])
+    assert len(capture.systems) == 1
+    assert "demo-skill" in capture.systems[0]
+    assert "演示技能唯一标记" in capture.systems[0]
+    assert "其他技能标记" not in capture.systems[0]  # 只注入指定 skill，非全量
+    # 持久化轮次的 session_init 记录所选 skill，回放可见
+    conv_id = resp.get_json()["conversation_id"]
+    conv = client.get(f"/api/conversations/{conv_id}").get_json()
+    init = conv["messages"][0]["events"][0]
+    assert init["type"] == "session_init"
+    assert init["skill"] == "demo-skill"
+    assert init["skills"] == ["demo-skill"]
+
+
+def test_chat_without_skill_keeps_default_behavior(tmp_path):
+    """缺省：不带 skill 字段 → 走原链路（无 memory 时 system=None），session_init.skill 为空。"""
+    capture = SystemCaptureClient()
+    app = _skill_app(tmp_path, capture)
+    client = app.test_client()
+    resp = client.post("/api/chat", json={"message": "你好"})
+    _finish(client, resp.get_json()["run_id"])
+    # 缺省走原链路：runtime 默认 system（不含任何 skill 行），非 skill 直注
+    assert len(capture.systems) == 1
+    assert "演示技能唯一标记" not in capture.systems[0]
+    assert "其他技能标记" not in capture.systems[0]
+    conv_id = resp.get_json()["conversation_id"]
+    conv = client.get(f"/api/conversations/{conv_id}").get_json()
+    init = conv["messages"][0]["events"][0]
+    assert init["skill"] is None
+    assert init["skills"] == ["demo-skill", "other-skill"]  # 全量清单
+
+
+def test_chat_with_unknown_skill_falls_back(tmp_path):
+    """未知 skill 名：不报错，回落默认链路（全量注入）。"""
+    capture = SystemCaptureClient()
+    app = _skill_app(tmp_path, capture)
+    client = app.test_client()
+    resp = client.post("/api/chat", json={"message": "你好", "skill": "ghost-skill"})
+    _finish(client, resp.get_json()["run_id"])
+    assert "演示技能唯一标记" not in capture.systems[0]  # 回落 runtime 默认 system
+    assert "其他技能标记" not in capture.systems[0]
+    conv_id = resp.get_json()["conversation_id"]
+    conv = client.get(f"/api/conversations/{conv_id}").get_json()
+    assert conv["messages"][0]["events"][0]["skill"] is None

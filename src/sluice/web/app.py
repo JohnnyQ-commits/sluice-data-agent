@@ -123,8 +123,25 @@ def create_app(
             memory = None
             vectors = None
 
-    def _memory_system(message: str) -> str | None:
-        """memory_enabled 时按消息重算 system（语义召回 skill 子集 + 长期记忆召回）；None = 用 runtime 默认。"""
+    def _memory_system(message: str, skill_name: str | None = None) -> str | None:
+        """按消息重算 system。
+
+        skill_name 指定时跳过语义匹配，直接注入该 skill 的 system（长期记忆召回仍叠加；
+        未知 skill 名回落默认链路）；缺省时 memory_enabled 走语义召回，None = 用 runtime 默认。
+        """
+        if skill_name:
+            pkg = next((p for p in packages if p.name == skill_name), None)
+            if pkg is not None:
+                system = build_system([pkg])
+                if memory is not None:
+                    try:
+                        recalled = memory.recall(_MEMORY_USER_ID, _MEMORY_SESSION_ID, message)
+                        if recalled:
+                            system += "\n\n[长期记忆召回]\n" + recalled
+                    except Exception:  # noqa: BLE001 — 召回失败仅用 skill system，不拖垮对话
+                        logger.warning("指定 skill 的记忆召回失败，仅注入 skill system")
+                return system
+            logger.warning("指定 skill 未找到: %s，回落默认链路", skill_name)
         if memory is None or vectors is None:
             return None
         try:
@@ -157,25 +174,30 @@ def create_app(
     def _runtime_registry() -> ToolRegistry:
         return runtime.registry
 
-    def _session_init(message: str) -> dict:
+    def _session_init(message: str, skill_name: str | None = None) -> dict:
         """开场事件：本次运行的可观测性快照。
 
-        skills 取 system prompt 实际注入的清单（memory 召回可能筛出子集，
-        与 _memory_system 同源同逻辑）；tools 以 registry 为唯一真相源全量遍历。
+        skills 取 system prompt 实际注入的清单（指定 skill 时为该 skill；memory 召回
+        可能筛出子集，与 _memory_system 同源同逻辑）；tools 以 registry 为唯一真相源全量遍历。
         """
-        skills = [p.name for p in packages]
-        if memory is not None and vectors is not None:
-            try:
-                picked = select_skills(
-                    packages, message, vectors, settings.memory_skill_match_threshold
-                )
-                if picked is not None:
-                    skills = [p.name for p in picked]
-            except Exception:  # noqa: BLE001 — 召回失败按全量报告，不拖垮开场
-                logger.warning("session_init 召回 Skill 子集失败，按全量报告")
+        forced = skill_name if any(p.name == skill_name for p in packages) else None
+        if forced:
+            skills = [forced]
+        else:
+            skills = [p.name for p in packages]
+            if memory is not None and vectors is not None:
+                try:
+                    picked = select_skills(
+                        packages, message, vectors, settings.memory_skill_match_threshold
+                    )
+                    if picked is not None:
+                        skills = [p.name for p in picked]
+                except Exception:  # noqa: BLE001 — 召回失败按全量报告，不拖垮开场
+                    logger.warning("session_init 召回 Skill 子集失败，按全量报告")
         return {
             "type": "session_init",
             "model": settings.llm_model,
+            "skill": forced,  # 用户强制指定的 skill；None = 自动匹配
             "skills": skills,
             "tools": [
                 {"name": d.name, "description": d.description}
@@ -211,13 +233,19 @@ def create_app(
                 q.put(ev)
 
             try:
+                # 指定 skill（可选）→ 跳过语义匹配直接注入该 skill system，缺省零变化
+                skill_name = (
+                    body["skill"] if isinstance(body.get("skill"), str) and body.get("skill") else None
+                )
                 # 开场先发 session_init（模型/Skill/工具清单/门禁/轮次上限），
                 # 经同一 tee 通道进轨迹与落盘，回放时可见；数据取自 web 层已持有的
                 # settings/runtime/registry，runtime.run 签名与 CLI 语义零变化
-                tee(_session_init(body["message"]))
+                tee(_session_init(body["message"], skill_name))
                 # runtime 会 emit final / error 事件，worker 不重复发
                 answer = runtime.run(
-                    body["message"], on_event=tee, system=_memory_system(body["message"])
+                    body["message"],
+                    on_event=tee,
+                    system=_memory_system(body["message"], skill_name),
                 )
             except Exception as exc:  # noqa: BLE001 — error 事件已 tee，这里仅收尾防线程裸死
                 logger.warning("本轮运行异常终止（error 事件已发）: %s", exc)

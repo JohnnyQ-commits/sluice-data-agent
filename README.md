@@ -7,7 +7,7 @@
 [![CI](https://github.com/JohnnyQ-commits/sluice-data-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/JohnnyQ-commits/sluice-data-agent/actions/workflows/ci.yml)
 [![Python](https://shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-319%20passed-brightgreen)](#快速体验)
+[![Tests](https://img.shields.io/badge/tests-322%20passed-brightgreen)](#快速体验)
 
 **[快速体验 ↓](#快速体验)** &nbsp;·&nbsp; **[架构](#架构)** &nbsp;·&nbsp; **[Skill 包协议](#skill-包协议)** &nbsp;·&nbsp; **[与同类项目的差异](#与同类项目的差异)**
 
@@ -68,7 +68,7 @@ pip install -e ".[dev]"
 ```bash
 python scripts/demo_guardrails.py    # 上面展示的三幕演示
 sluice eval --all --skip-judge       # 三层评测跑一遍
-pytest tests/ -q                     # 319 个测试全部零 key 可跑
+pytest tests/ -q                     # 322 个测试全部零 key 可跑
 ```
 
 **第二档：配置 LLM 解锁完整体验**（任意 Anthropic Messages 兼容端点）：
@@ -92,7 +92,7 @@ sluice eval --all                    # 完整评测含 judge 打分
 - **零官方 LLM SDK** —— httpx 直连网关，function calling 手写实现，行为完全可读
 - **零官方 SDK 的 MCP client** —— protocol / transport / registry 三件套自实现（见[下文](#mcp-生态)）
 - **长期记忆** —— FAISS 本地向量检索，可选 Milvus 后端，默认关闭零行为变化
-- **零 API key 全量测试** —— 319 个测试，CI 持续验证
+- **零 API key 全量测试** —— 322 个测试，CI 持续验证
 
 ## 架构
 
@@ -220,7 +220,7 @@ sluice mcp --call mcp__filesystem__read_file --args '{"path": "langgraph_weekly/
 
 ## Status
 
-**alpha**。核心闭环、可靠性、评测、生态四层均已落地并有全量测试（319 tests）与 CI 门禁，API 仍可能变化。
+**alpha**。核心闭环、可靠性、评测、生态四层均已落地并有全量测试（322 tests）与 CI 门禁，API 仍可能变化。
 
 工程过程即文档：`docs/plans/` 保留 P0–P5 六个阶段的完整实现计划（含执行红线），可以完整复盘每一层是怎么一步步建起来的。
 
