@@ -17,6 +17,7 @@
 /* ---------- 色板：运行时变量（light 默认 / dark 跟随系统）---------- */
 
 :root {
+  color-scheme: light;
   --paper: #f7f8fa; /* 页面外围：浅灰 */
   --surface: #ffffff; /* 内容列/卡面：纯净白 */
   --code: #f3f2ee; /* 代码块内嵌底 */
@@ -41,8 +42,37 @@
   --elev-soft: 0 1px 3px rgba(28, 36, 51, 0.04); /* 命令栏更轻阴影 */
 }
 
+/* 主题三态：data-theme 属性显式覆盖，system 态（无属性）回落媒体查询。
+   dark 变量在此声明两份（属性块 + 媒体回落块），改色板需同步两处。 */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #10151c;
+  --surface: #161d26;
+  --code: #0c1016;
+  --ink: #e6e9ee;
+  --ink2: #94a0b0;
+  --brand: #7fa6d9;
+  --brandfg: #0e1520;
+  --brandhover: #94bcec;
+  --brandsoft: rgba(127, 166, 217, 0.1);
+  --accent: #ff9a57;
+  --accentsoft: rgba(255, 154, 87, 0.08);
+  --ok: #51cf66;
+  --oksoft: rgba(81, 207, 102, 0.08);
+  --danger: #ff6b6b;
+  --dangersoft: rgba(255, 107, 107, 0.08);
+
+  --line: rgba(230, 233, 238, 0.12);
+  --hairline: rgba(230, 233, 238, 0.06);
+  --rail: rgba(230, 233, 238, 0.05);
+  --bar: rgba(230, 233, 238, 0.14);
+  --elev: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --elev-soft: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --paper: #10151c;
     --surface: #161d26;
     --code: #0c1016;
@@ -91,10 +121,6 @@
 /* ---------- 全局基调 ---------- */
 
 @layer base {
-  html {
-    color-scheme: light dark;
-  }
-
   body {
     color: var(--ink);
     font-family: var(--font-sans);

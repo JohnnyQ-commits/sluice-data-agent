@@ -23,8 +23,10 @@ from ..runtime.prompt import build_system
 from ..skills.loader import SkillLoader
 from ..tools.query_data import QueryDataTool
 from ..tools.registry import ToolRegistry
+from ..web.conversations import ConversationStore
 
 _FRONTEND_DIST = Path(__file__).resolve().parents[3] / "web" / "frontend" / "dist"
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 # web 壳无账号体系：单机固定用户 + 单滚动会话（跨消息累积轮次，超限才摘要升维）
 _MEMORY_USER_ID = "local"
@@ -38,10 +40,18 @@ def _stream_idle_timeout(settings: Settings) -> float:
     return (settings.llm_max_retries + 1) * settings.llm_timeout_seconds + 60
 
 
-def create_app(client=None, registry=None, runtime=None, skills_dir="skills") -> Flask:
+def create_app(
+    client=None, registry=None, runtime=None, skills_dir="skills", conversations_dir=None
+) -> Flask:
     app = Flask(__name__, static_folder=None)
     settings = Settings()
     settings = resolve_audit_dir(settings)
+    # 会话持久化：默认 repo 根 data/conversations/（与 audit/ 同级），测试可注入 tmp_path
+    conversations = ConversationStore(
+        conversations_dir
+        if conversations_dir is not None
+        else _REPO_ROOT / "data" / "conversations"
+    )
     client = client or LLMClient(settings)
     if registry is None:
         registry = ToolRegistry()
@@ -144,31 +154,79 @@ def create_app(client=None, registry=None, runtime=None, skills_dir="skills") ->
             return jsonify({"error": "message 必填"}), 400
         run_id = uuid.uuid4().hex
         q: queue.Queue = queue.Queue()
-        runs[run_id] = q
+        persisted = threading.Event()  # worker 落盘完成信号（stream 终结前等待）
+        runs[run_id] = (q, persisted)
+
+        # 会话归属：无 id 或 id 失效 → 新建并在响应中告知前端
+        conversation_id = body.get("conversation_id")
+        if not isinstance(conversation_id, str) or conversations.load(conversation_id) is None:
+            conversation_id = conversations.create()
 
         def worker():
+            events = []
+            answer = None
+
+            def tee(ev):
+                events.append(ev)
+                q.put(ev)
+
             try:
                 # runtime 会 emit final / error 事件，worker 不重复发
                 answer = runtime.run(
-                    body["message"], on_event=q.put, system=_memory_system(body["message"])
+                    body["message"], on_event=tee, system=_memory_system(body["message"])
                 )
-            except Exception:  # noqa: BLE001 — error 事件已由 runtime 发出，这里仅收尾防线程裸死
-                return
-            if memory is not None:
+            except Exception as exc:  # noqa: BLE001 — error 事件已 tee，这里仅收尾防线程裸死
+                logger.warning("本轮运行异常终止（error 事件已发）: %s", exc)
+            # 每轮增量落盘（final 不进轨迹，answer 单独存；error 收尾也留痕）
+            try:
+                conversations.append_turn(
+                    conversation_id,
+                    body["message"],
+                    [e for e in events if e.get("type") != "final"],
+                    answer,
+                )
+            except Exception:  # noqa: BLE001 — 会话写盘失败不拖垮对话
+                logger.warning("会话落盘失败: %s", body["message"][:50])
+            if memory is not None and answer is not None:
                 try:
                     memory.record(_MEMORY_USER_ID, _MEMORY_SESSION_ID, "user", body["message"])
                     memory.record(_MEMORY_USER_ID, _MEMORY_SESSION_ID, "assistant", answer)
                 except Exception:  # noqa: BLE001 — 记忆落盘失败不拖垮对话
                     logger.warning("会话记忆落盘失败: %s", body["message"][:50])
+            persisted.set()
 
         threading.Thread(target=worker, daemon=True).start()
-        return jsonify({"run_id": run_id})
+        return jsonify({"run_id": run_id, "conversation_id": conversation_id})
+
+    # ---------------- 会话持久化端点（前端侧栏） ----------------
+
+    @app.get("/api/conversations")
+    def list_conversations():
+        return jsonify({"conversations": conversations.list()})
+
+    @app.post("/api/conversations")
+    def create_conversation():
+        return jsonify({"id": conversations.create()})
+
+    @app.get("/api/conversations/<conv_id>")
+    def get_conversation(conv_id: str):
+        conv = conversations.load(conv_id)
+        if conv is None:
+            return jsonify({"error": "会话不存在"}), 404
+        return jsonify(conv)
+
+    @app.delete("/api/conversations/<conv_id>")
+    def delete_conversation(conv_id: str):
+        if not conversations.delete(conv_id):
+            return jsonify({"error": "会话不存在"}), 404
+        return jsonify({"ok": True})
 
     @app.get("/api/stream/<run_id>")
     def stream(run_id: str):
-        q = runs.get(run_id)
-        if q is None:
+        entry = runs.get(run_id)
+        if entry is None:
             return jsonify({"error": "未知 run_id"}), 404
+        q, persisted = entry
 
         def generate():
             while True:
@@ -181,6 +239,7 @@ def create_app(client=None, registry=None, runtime=None, skills_dir="skills") ->
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
                 if event.get("type") in ("final", "error"):
                     runs.pop(run_id, None)
+                    persisted.wait(timeout=10)  # 落盘先于 end，读回一致性
                     yield "event: end\ndata: {}\n\n"
                     return
 
