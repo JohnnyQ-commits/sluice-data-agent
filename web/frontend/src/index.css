@@ -163,6 +163,123 @@
   --stampbg: var(--dangersoft);
 }
 
+/* ---------- 报告卡 markdown 正文：贴合设计系统的手写作用域样式 ---------- */
+
+.report-md {
+  font-size: 0.875rem;
+  line-height: 1.625;
+  color: var(--ink);
+  overflow-wrap: break-word;
+}
+.report-md > :first-child {
+  margin-top: 0;
+}
+.report-md > :last-child {
+  margin-bottom: 0;
+}
+.report-md h1,
+.report-md h2,
+.report-md h3,
+.report-md h4 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink);
+  margin: 1.25em 0 0.5em;
+}
+.report-md h1 {
+  font-size: 1.25rem;
+}
+.report-md h2 {
+  font-size: 1.125rem;
+}
+.report-md h3 {
+  font-size: 1rem;
+}
+.report-md h4 {
+  font-size: 0.875rem;
+}
+.report-md p {
+  margin: 0.625em 0;
+}
+.report-md strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+.report-md ul,
+.report-md ol {
+  margin: 0.625em 0;
+  padding-left: 1.5em;
+}
+.report-md li {
+  margin: 0.25em 0;
+}
+.report-md li::marker {
+  color: var(--ink2);
+}
+.report-md code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  background: var(--code);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+.report-md pre {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  background: var(--code);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+.report-md pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.report-md blockquote {
+  margin: 0.75em 0;
+  padding: 0.25em 0 0.25em 0.875em;
+  border-left: 3px solid var(--rail);
+  color: var(--ink2);
+}
+.report-md hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1.25em 0;
+}
+/* GFM 表格：全宽 + 墨@10% 边框 + 表头浅底 + 横向滚动 */
+.report-md table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 0.75em 0;
+  font-size: 0.8125rem;
+}
+.report-md th,
+.report-md td {
+  border: 1px solid var(--line);
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.report-md th {
+  font-weight: 600;
+  background: color-mix(in srgb, var(--ink) 3%, var(--paper)); /* paper 加深一档 */
+  white-space: nowrap;
+}
+.report-md a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* ---------- 命令栏：聚焦墨蓝 ring + 上浮 ---------- */
 
 .cmdbar {

@@ -1,3 +1,5 @@
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useEffect, useRef, useState } from "react";
 
 // 空状态示例指令（点击填入输入框——渲染层最小交互）
@@ -266,9 +268,11 @@ export default function App() {
                               REPORT
                             </span>
                           </div>
-                          <pre className="px-4 py-3 font-sans text-sm leading-relaxed whitespace-pre-wrap text-ink">
-                            {m.answer}
-                          </pre>
+                          <div className="report-md px-4 py-3">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {m.answer}
+                            </ReactMarkdown>
+                          </div>
                         </div>
                       </TimelineRow>
                     )}
