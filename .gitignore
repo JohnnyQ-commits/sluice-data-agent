@@ -11,3 +11,6 @@ evals/reports/
 .idea/
 web_server*.log
 .mcp.json
+
+web5010*.log
+web*.err.log
