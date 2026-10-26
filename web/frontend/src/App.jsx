@@ -812,7 +812,7 @@ export default function App() {
                             </div>
                             <div className="report-md px-5 py-5">
                               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {m.answer}
+                                {m.answer.replace(/~/g, "\\~")}
                               </ReactMarkdown>
                             </div>
                           </div>
