@@ -1,17 +1,14 @@
-@import "@fontsource/ibm-plex-mono/400.css";
-@import "@fontsource/ibm-plex-mono/500.css";
-@import "@fontsource/ibm-plex-mono/600.css";
 @import "tailwindcss";
 
-/* ---------- 字体令牌：UI 正文中文优先系统栈（DeepSeek 式原生渲染），等宽保留 Plex Mono ---------- */
+/* ---------- 字体令牌：全站统一中文优先系统栈（等宽已移除，代码块用底色/边框/字号区分） ---------- */
 
 @theme {
   --font-sans:
     -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei UI",
     "Microsoft YaHei", system-ui, sans-serif;
   --font-mono:
-    "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei UI",
+    "Microsoft YaHei", system-ui, sans-serif;
 }
 
 /* ---------- 色板：运行时变量（light 默认 / dark 跟随系统）---------- */
@@ -226,16 +223,18 @@
   color: var(--ink2);
 }
 .report-md code {
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem; /* 13px：比正文小一档 */
+  line-height: 1.6;
   background: var(--code);
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.1em 0.35em;
 }
 .report-md pre {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 0.8125rem;
+  line-height: 1.6;
   background: var(--code);
   border: 1px solid var(--line);
   border-radius: 8px;

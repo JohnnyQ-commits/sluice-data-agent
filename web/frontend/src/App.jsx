@@ -93,7 +93,7 @@ function EventLine({ ev }) {
     return (
       <TimelineRow className="mt-6 first:mt-0" dot="bg-brand">
         <div className="flex items-center gap-2.5">
-          <span className="font-mono text-[11px] font-semibold tracking-[0.18em] text-ink2 uppercase">
+          <span className="text-[11px] font-semibold tracking-[0.08em] text-ink2 uppercase">
             ROUND {String(ev.round).padStart(2, "0")}
           </span>
           <span aria-hidden="true" className="h-px flex-1 bg-rail" />
@@ -105,11 +105,11 @@ function EventLine({ ev }) {
     return (
       <TimelineRow className="mt-3" dot="bg-brand">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
-          <span className="inline-flex items-center gap-1 rounded-md border border-brand/40 bg-brandsoft px-1.5 py-0.5 font-mono text-xs font-medium text-brand">
+          <span className="inline-flex items-center gap-1 rounded-md border border-brand/40 bg-brandsoft px-1.5 py-0.5 text-xs font-medium text-brand">
             <span aria-hidden="true">⚙</span>
             {ev.name}
           </span>
-          <code className="min-w-0 max-w-full overflow-x-auto rounded-md border border-line bg-code px-1.5 py-0.5 font-mono text-xs text-ink2">
+          <code className="min-w-0 max-w-full overflow-x-auto rounded-md border border-line bg-code px-1.5 py-0.5 text-[13px] text-ink2">
             {JSON.stringify(ev.args)}
           </code>
         </div>
@@ -121,7 +121,7 @@ function EventLine({ ev }) {
       <TimelineRow className="mt-2" dot="bg-brand/50">
         <details className="group py-0.5 text-sm">
           <summary
-            className={`inline-flex cursor-pointer list-none items-center gap-1 font-mono text-xs transition-colors ${
+            className={`inline-flex cursor-pointer list-none items-center gap-1 text-xs transition-colors ${
               ev.is_error ? "text-danger hover:opacity-75" : "text-ink2 hover:text-ink"
             }`}
           >
@@ -134,7 +134,7 @@ function EventLine({ ev }) {
             观察：{ev.name}
             {ev.is_error ? "（出错）" : ""}
           </summary>
-          <pre className="mt-1 max-h-40 overflow-auto rounded-md border border-line bg-code p-2 font-mono text-xs leading-relaxed whitespace-pre-wrap text-ink">
+          <pre className="mt-1 max-h-40 overflow-auto rounded-md border border-line bg-code p-2 text-[13px] leading-[1.6] whitespace-pre-wrap text-ink">
             {ev.observation}
           </pre>
         </details>
@@ -153,12 +153,12 @@ function EventLine({ ev }) {
         <div className={`stamp ${stamp.cls} px-4 py-3.5`}>
           <div className="flex items-baseline justify-between gap-3">
             <span
-              className="font-mono text-[10px] font-semibold tracking-[0.22em]"
+              className="text-[11px] font-semibold tracking-[0.08em]"
               style={{ color: "var(--stampc)" }}
             >
               {stamp.label}
             </span>
-            <span className="font-mono text-[10px] tracking-[0.12em] text-ink2">
+            <span className="text-[10px] tracking-[0.05em] text-ink2">
               GATE {ev.gate} · ROUND {String(ev.round).padStart(2, "0")}
             </span>
           </div>
@@ -172,7 +172,7 @@ function EventLine({ ev }) {
       <TimelineRow className="mt-3" dot="bg-danger">
         <div className="stamp stamp-degraded px-4 py-3.5">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="font-mono text-[10px] font-semibold tracking-[0.22em] text-danger">
+            <span className="text-[11px] font-semibold tracking-[0.08em] text-danger">
               ERROR
             </span>
           </div>
@@ -493,7 +493,7 @@ export default function App() {
           <div className="shrink-0 border-t border-[color:var(--hairline)] px-2 pt-2.5 pb-3">
             <div className="flex items-center gap-2 px-2">
               <span className="text-xs text-ink2">Skills</span>
-              <span className="font-mono text-[10px] text-ink2">{skills.length}</span>
+              <span className="text-[10px] text-ink2">{skills.length}</span>
               <button
                 type="button"
                 onClick={() => {
@@ -515,19 +515,19 @@ export default function App() {
                     onChange={(e) => setMountInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && mountSkill()}
                     placeholder="服务器本地绝对路径，如 E:\skills\my-skill"
-                    className="min-w-0 flex-1 rounded-lg border border-bar bg-paper px-2.5 py-1.5 font-mono text-xs text-ink outline-none placeholder:text-ink2/60 focus:border-brand"
+                    className="min-w-0 flex-1 rounded-lg border border-bar bg-paper px-2.5 py-1.5 text-xs text-ink outline-none placeholder:text-ink2/60 focus:border-brand"
                   />
                   <button
                     type="button"
                     onClick={mountSkill}
-                    className="shrink-0 cursor-pointer rounded-lg bg-brand px-2.5 py-1.5 font-mono text-xs text-brandfg transition-colors duration-150 hover:bg-brandhover"
+                    className="shrink-0 cursor-pointer rounded-lg bg-brand px-2.5 py-1.5 text-xs text-brandfg transition-colors duration-150 hover:bg-brandhover"
                   >
                     挂载
                   </button>
                 </div>
                 {mountMsg && (
                   <p
-                    className={`mt-1.5 rounded-md px-2 py-1.5 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap ${
+                    className={`mt-1.5 rounded-md px-2 py-1.5 text-[11px] leading-relaxed break-all whitespace-pre-wrap ${
                       mountMsg.ok ? "text-ok" : "text-danger"
                     }`}
                   >
@@ -547,10 +547,10 @@ export default function App() {
                     }`}
                   >
                     <Icon path={ICONS.box} className="h-3.5 w-3.5 shrink-0 text-ink2" />
-                    <span className="min-w-0 flex-1 truncate font-mono text-xs text-ink">
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink">
                       {s.name}
                     </span>
-                    <span className="shrink-0 font-mono text-[10px] text-ink2">
+                    <span className="shrink-0 text-[10px] text-ink2">
                       {s.tools.length} 工具
                     </span>
                     <Icon
@@ -582,7 +582,7 @@ export default function App() {
                     <div className="mt-1 rounded-xl border border-line bg-paper px-3 py-2.5">
                       <p className="text-xs leading-relaxed text-ink">{s.description}</p>
                       {s.output_contract.length > 0 && (
-                        <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink2">
+                        <p className="mt-2 text-[10px] leading-relaxed text-ink2">
                           契约：{s.output_contract.join(" · ")}
                         </p>
                       )}
@@ -590,13 +590,13 @@ export default function App() {
                         <ul className="mt-2 space-y-1">
                           {s.tools.map((t) => (
                             <li key={t.name} className="text-[11px] leading-snug text-ink2">
-                              <span className="font-mono text-ink">{t.name}</span>
+                              <span className="font-medium text-ink">{t.name}</span>
                               {t.description ? ` — ${t.description}` : ""}
                             </li>
                           ))}
                         </ul>
                       )}
-                      <p className="mt-2 font-mono text-[10px] text-ink2">
+                      <p className="mt-2 text-[10px] text-ink2">
                         评测 {s.evals} 条{s.user_mounted ? " · 用户挂载" : " · 内置"}
                       </p>
                     </div>
@@ -627,15 +627,15 @@ export default function App() {
             >
               <Icon path={ICONS.panel} className="h-[18px] w-[18px]" />
             </button>
-            <span className="font-mono text-base font-semibold tracking-[0.2em] text-ink uppercase">
+            <span className="text-base font-semibold tracking-[0.12em] text-ink uppercase">
               SLUICE
             </span>
             <span
               aria-hidden="true"
               className={`h-2 w-2 rounded-full bg-accent ${busy ? "breathe" : ""}`}
             />
-            <span className="font-mono text-xs text-ink2">{busy ? "运行中" : "空闲"}</span>
-            <span className="ml-auto hidden font-mono text-[11px] tracking-[0.08em] text-ink2 sm:block">
+            <span className="text-[13px] text-ink2">{busy ? "运行中" : "空闲"}</span>
+            <span className="ml-auto hidden text-[11px] tracking-[0.05em] text-ink2 sm:block">
               SKILL-MOUNTED DATA AGENT
             </span>
             {/* 主题三态：light → dark → system */}
@@ -669,7 +669,7 @@ export default function App() {
                       key={t}
                       type="button"
                       onClick={() => setInput(t)}
-                      className="cursor-pointer rounded-full border border-line bg-paper px-4 py-2.5 text-center font-mono text-xs text-ink2 transition-colors hover:border-brand/40 hover:text-brand"
+                      className="cursor-pointer rounded-full border border-line bg-paper px-4 py-2.5 text-center text-xs text-ink2 transition-colors hover:border-brand/40 hover:text-brand"
                     >
                       {t}
                     </button>
@@ -698,7 +698,7 @@ export default function App() {
                         <TimelineRow className="mt-6" dot="bg-accent">
                           <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-panel">
                             <div className="border-b border-[color:var(--hairline)] px-5 py-2.5">
-                              <span className="font-mono text-[10px] font-semibold tracking-[0.22em] text-accent uppercase">
+                              <span className="text-[11px] font-semibold tracking-[0.08em] text-accent uppercase">
                                 REPORT
                               </span>
                             </div>
@@ -724,7 +724,7 @@ export default function App() {
           <div className="mx-auto w-full max-w-3xl border-x border-[color:var(--hairline)] bg-surface px-4 pt-2 pb-6 sm:px-6">
             <div className="cmdbar flex items-center gap-2 rounded-2xl border border-bar bg-surface p-2 pl-4">
               <input
-                className="min-w-0 flex-1 border-0 bg-transparent font-mono text-[15px] text-ink outline-none placeholder:text-ink2/70 disabled:cursor-not-allowed disabled:opacity-50"
+                className="min-w-0 flex-1 border-0 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink2/70 disabled:cursor-not-allowed disabled:opacity-50"
                 value={input}
                 placeholder={busy ? "Agent 运行中…" : "向 Agent 下达数据指令…"}
                 onChange={(e) => setInput(e.target.value)}
@@ -732,7 +732,7 @@ export default function App() {
                 disabled={busy}
               />
               <button
-                className="shrink-0 cursor-pointer rounded-xl bg-brand px-4 py-2 font-mono text-sm font-medium text-brandfg transition-colors hover:bg-brandhover focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+                className="shrink-0 cursor-pointer rounded-xl bg-brand px-4 py-2 text-sm font-medium text-brandfg transition-colors hover:bg-brandhover focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
                 onClick={send}
                 disabled={busy}
               >
