@@ -761,7 +761,7 @@ export default function App() {
                     >
                       <Icon path={ICONS[f.icon]} className="h-[18px] w-[18px] text-brand" />
                       <p className="mt-2 text-sm font-medium text-ink">{f.title}</p>
-                      <p className="mt-1 text-xs leading-relaxed text-ink2">{f.desc}</p>
+                      <p className="mt-1 truncate text-[11px] text-ink2" title={f.desc}>{f.desc}</p>
                     </div>
                   ))}
                 </div>
