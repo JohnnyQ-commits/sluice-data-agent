@@ -64,7 +64,22 @@ const ICONS = {
       <path d="M3 8l9 5 9-5M12 13v8" />
     </>
   ),
+  shield: <path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z" />,
+  badge: (
+    <>
+      <path d="M12 3l2 2h3v3l2 2-2 2v3h-3l-2 2-2-2H7v-3l-2-2 2-2V5h3z" />
+      <path d="M9.5 12l2 2 3.5-3.5" />
+    </>
+  ),
+  file: <path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h3" />,
 };
+
+/* 空状态三特性卡：价值主张引导 */
+const FEATURES = [
+  { icon: "shield", title: "四拦截点门禁", desc: "幻觉工具 / 重复调用 / 契约缺失 / 自修恢复" },
+  { icon: "badge", title: "防作弊评测", desc: "judge 评分必须引用产出原文" },
+  { icon: "file", title: "审计留痕", desc: "每次拦截与自修 JSONL 落盘可追溯" },
+];
 
 /* 历史会话相对时间 */
 function relTime(iso) {
@@ -103,6 +118,8 @@ function EventLine({ ev }) {
             <span className="text-[11px] font-semibold tracking-[0.08em] uppercase">System Init</span>
             <span aria-hidden="true" className="h-px w-4 bg-rail" />
             <span>模型 {ev.model}</span>
+            <span aria-hidden="true">·</span>
+            <span>Skill {ev.skill || "自动匹配"}</span>
             <span aria-hidden="true">·</span>
             <span>工具 {(ev.tools || []).length} 个</span>
             <span aria-hidden="true">·</span>
@@ -270,6 +287,8 @@ export default function App() {
   const [mountInput, setMountInput] = useState(""); // 挂载路径输入框显隐 + 值
   const [mountMsg, setMountMsg] = useState(null); // { ok, text } 服务端具体原因原样可见
   const [confirmUnskill, setConfirmUnskill] = useState(null); // 二击确认卸载的 skill 名
+  const [selSkill, setSelSkill] = useState(null); // 本次发送强制使用的 skill；null = 自动匹配
+  const [skillMenuOpen, setSkillMenuOpen] = useState(false); // 命令栏 skill 选择菜单
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -425,6 +444,7 @@ export default function App() {
     if (!text || busy) return;
     setInput("");
     setBusy(true);
+    setSkillMenuOpen(false);
     setMessages((m) => [...m, { role: "user", text }]);
 
     let es;
@@ -436,6 +456,7 @@ export default function App() {
           body: JSON.stringify({
             message: text,
             ...(activeId ? { conversation_id: activeId } : {}),
+            ...(selSkill ? { skill: selSkill } : {}),
           }),
         })
       ).json();
@@ -720,9 +741,30 @@ export default function App() {
         <main className="scroll-thin min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col border-x border-[color:var(--hairline)] bg-surface px-4 py-10 sm:px-6">
             {messages.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center py-20 text-center">
+              <div className="relative isolate flex flex-1 flex-col items-center justify-center py-20 text-center">
+                {/* 极轻径向光晕：brand@4%，中心在页面上三分之一处 */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 -z-10"
+                  style={{
+                    background:
+                      "radial-gradient(480px 260px at 50% 22%, color-mix(in srgb, var(--brand) 4%, transparent), transparent 70%)",
+                  }}
+                />
                 <h2 className="text-3xl font-semibold text-ink">你好，我是 Sluice</h2>
                 <p className="mt-3 text-[15px] text-ink2">下达数据指令，每一步都可见、可信</p>
+                <div className="mt-8 grid w-full max-w-2xl gap-3 sm:grid-cols-3">
+                  {FEATURES.map((f) => (
+                    <div
+                      key={f.title}
+                      className="rounded-xl border border-[color:var(--hairline)] bg-paper/60 px-4 py-3.5 text-left transition-all duration-150 hover:-translate-y-0.5 hover:bg-paper hover:shadow-panel"
+                    >
+                      <Icon path={ICONS[f.icon]} className="h-[18px] w-[18px] text-brand" />
+                      <p className="mt-2 text-sm font-medium text-ink">{f.title}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-ink2">{f.desc}</p>
+                    </div>
+                  ))}
+                </div>
                 <div className="mt-8 flex w-full max-w-md flex-col gap-2.5">
                   {EXAMPLE_COMMANDS.map((t) => (
                     <button
@@ -782,22 +824,82 @@ export default function App() {
         {/* 输入区 = 命令栏（贴底悬浮） */}
         <div className="anim-rise-2 relative shrink-0">
           <div className="mx-auto w-full max-w-3xl border-x border-[color:var(--hairline)] bg-surface px-4 pt-2 pb-6 sm:px-6">
-            <div className="cmdbar flex items-center gap-2 rounded-2xl border border-bar bg-surface p-2 pl-4">
-              <input
-                className="min-w-0 flex-1 border-0 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink2/70 disabled:cursor-not-allowed disabled:opacity-50"
-                value={input}
-                placeholder={busy ? "Agent 运行中…" : "向 Agent 下达数据指令…"}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && send()}
-                disabled={busy}
-              />
-              <button
-                className="shrink-0 cursor-pointer rounded-xl bg-brand px-4 py-2 text-sm font-medium text-brandfg transition-colors hover:bg-brandhover focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-                onClick={send}
-                disabled={busy}
-              >
-                发送
-              </button>
+            <div className="cmdbar rounded-2xl border border-bar bg-surface p-2 pl-4">
+              <div className="flex items-center gap-2">
+                <input
+                  className="min-w-0 flex-1 border-0 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink2/70 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={input}
+                  placeholder={busy ? "Agent 运行中…" : "向 Agent 下达数据指令…"}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && send()}
+                  disabled={busy}
+                />
+                <button
+                  className="shrink-0 cursor-pointer rounded-xl bg-brand px-4 py-2 text-sm font-medium text-brandfg transition-colors hover:bg-brandhover focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={send}
+                  disabled={busy}
+                >
+                  发送
+                </button>
+              </div>
+              {/* Skill 选择 chip：缺省自动匹配，选中后本次发送强制注入该 skill */}
+              <div className="relative mt-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSkillMenuOpen((v) => !v)}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-line bg-paper px-2.5 py-1 text-xs text-ink2 transition-colors duration-150 hover:border-brand/40 hover:text-brand"
+                  aria-expanded={skillMenuOpen}
+                >
+                  <Icon path={ICONS.box} className="h-3 w-3" />
+                  Skill · {selSkill || "自动匹配"}
+                  <Icon
+                    path={ICONS.chevron}
+                    className={`h-3 w-3 transition-transform ${skillMenuOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {skillMenuOpen && (
+                  <div className="scroll-thin absolute bottom-full left-0 z-20 mb-1.5 max-h-64 w-72 overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-panel">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelSkill(null);
+                        setSkillMenuOpen(false);
+                      }}
+                      className={`w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
+                        selSkill === null ? "bg-brandsoft font-medium text-brand" : "text-ink2 hover:bg-paper hover:text-ink"
+                      }`}
+                    >
+                      自动匹配（按消息语义召回）
+                    </button>
+                    {skills.map((s) => (
+                      <button
+                        key={s.name}
+                        type="button"
+                        onClick={() => {
+                          setSelSkill(s.name);
+                          setSkillMenuOpen(false);
+                        }}
+                        className={`w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left transition-colors ${
+                          selSkill === s.name ? "bg-brandsoft" : "hover:bg-paper"
+                        }`}
+                      >
+                        <span
+                          className={`block text-xs ${
+                            selSkill === s.name ? "font-medium text-brand" : "font-medium text-ink"
+                          }`}
+                        >
+                          {s.name}
+                        </span>
+                        {s.description && (
+                          <span className="mt-0.5 block truncate text-[11px] text-ink2">
+                            {s.description}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
