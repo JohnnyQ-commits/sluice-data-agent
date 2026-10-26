@@ -1,84 +1,112 @@
 import { useEffect, useRef, useState } from "react";
 
+// 空状态示例指令（点击填入输入框——渲染层最小交互）
+const EXAMPLE_COMMANDS = ["生成上周的用户活跃周报", "查看当前可用的数据表和字段"];
+
+/* 时间线行：左侧竖轨上的节点圆点 + 内容 */
+function TimelineRow({ className, dot, children }) {
+  return (
+    <div className={`anim-entry relative pl-6 ${className}`}>
+      <span
+        aria-hidden="true"
+        className={`absolute top-[6px] left-[1px] h-2.5 w-2.5 rounded-full shadow-[0_0_0_3px_var(--paper)] ${dot}`}
+      />
+      {children}
+    </div>
+  );
+}
+
 function EventLine({ ev }) {
   if (ev.type === "round_start") {
     return (
-      <div className="mt-3 mb-1 flex items-center gap-2 first:mt-0">
-        <span className="text-xs font-semibold tracking-wide text-slate-400 dark:text-slate-500">
-          第 {ev.round} 轮
-        </span>
-        <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-      </div>
+      <TimelineRow className="mt-4 first:mt-0" dot="bg-brand">
+        <div className="flex items-center gap-2.5">
+          <span className="font-mono text-[11px] font-semibold tracking-[0.18em] text-ink2 uppercase">
+            ROUND {String(ev.round).padStart(2, "0")}
+          </span>
+          <span aria-hidden="true" className="h-px flex-1 bg-rail" />
+        </div>
+      </TimelineRow>
     );
   }
   if (ev.type === "tool_call") {
     return (
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5 text-sm">
-        <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 font-mono text-xs font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-          <span aria-hidden="true">⚙</span>
-          {ev.name}
-        </span>
-        <code className="min-w-0 max-w-full overflow-x-auto rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          {JSON.stringify(ev.args)}
-        </code>
-      </div>
+      <TimelineRow className="mt-2" dot="bg-brand">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
+          <span className="inline-flex items-center gap-1 rounded-md border border-brand/40 bg-brandsoft px-1.5 py-0.5 font-mono text-xs font-medium text-brand">
+            <span aria-hidden="true">⚙</span>
+            {ev.name}
+          </span>
+          <code className="min-w-0 max-w-full overflow-x-auto rounded-md border border-line bg-code px-1.5 py-0.5 font-mono text-xs text-ink2">
+            {JSON.stringify(ev.args)}
+          </code>
+        </div>
+      </TimelineRow>
     );
   }
   if (ev.type === "observation") {
     return (
-      <details className="group py-0.5 text-sm">
-        <summary
-          className={
-            ev.is_error
-              ? "inline-flex cursor-pointer list-none items-center gap-1 text-red-600 transition-colors hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-              : "inline-flex cursor-pointer list-none items-center gap-1 text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-          }
-        >
-          <span
-            aria-hidden="true"
-            className="inline-block w-3 text-center text-xs transition-transform group-open:rotate-90"
+      <TimelineRow className="mt-1" dot="bg-brand/50">
+        <details className="group py-0.5 text-sm">
+          <summary
+            className={`inline-flex cursor-pointer list-none items-center gap-1 font-mono text-xs transition-colors ${
+              ev.is_error ? "text-danger hover:opacity-75" : "text-ink2 hover:text-ink"
+            }`}
           >
-            ▸
-          </span>
-          观察：{ev.name}
-          {ev.is_error ? "（出错）" : ""}
-        </summary>
-        <pre className="mt-1 max-h-40 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-2 font-mono text-xs leading-relaxed whitespace-pre-wrap text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-          {ev.observation}
-        </pre>
-      </details>
+            <span
+              aria-hidden="true"
+              className="inline-block w-3 text-center text-xs transition-transform group-open:rotate-90"
+            >
+              ▸
+            </span>
+            观察：{ev.name}
+            {ev.is_error ? "（出错）" : ""}
+          </summary>
+          <pre className="mt-1 max-h-40 overflow-auto rounded-md border border-line bg-code p-2 font-mono text-xs leading-relaxed whitespace-pre-wrap text-ink">
+            {ev.observation}
+          </pre>
+        </details>
+      </TimelineRow>
     );
   }
   if (ev.type === "guardrail") {
-    const style =
+    const stamp =
       ev.action === "blocked"
-        ? "border-l-amber-400 bg-amber-50 text-amber-800 dark:border-l-amber-500 dark:bg-amber-950/40 dark:text-amber-300"
+        ? { cls: "stamp-blocked", label: "BLOCKED", dot: "bg-accent" }
         : ev.action === "repaired"
-          ? "border-l-emerald-400 bg-emerald-50 text-emerald-700 dark:border-l-emerald-500 dark:bg-emerald-950/40 dark:text-emerald-300"
-          : "border-l-red-400 bg-red-50 text-red-700 dark:border-l-red-500 dark:bg-red-950/40 dark:text-red-300";
-    const label =
-      ev.action === "blocked" ? "拦截" : ev.action === "repaired" ? "自修通过" : "降级交付";
+          ? { cls: "stamp-repaired", label: "REPAIRED", dot: "bg-ok" }
+          : { cls: "stamp-degraded", label: "DEGRADED", dot: "bg-danger" };
     return (
-      <div
-        className={`flex items-start gap-2 rounded-md border border-slate-200 border-l-4 p-2 text-sm leading-relaxed dark:border-slate-800 ${style}`}
-      >
-        <span aria-hidden="true" className="mt-0.5 shrink-0">
-          🛡
-        </span>
-        <span>
-          门禁[{ev.gate}] {label}（第 {ev.round} 轮）：{ev.reason}
-        </span>
-      </div>
+      <TimelineRow className="mt-2" dot={stamp.dot}>
+        <div className={`stamp ${stamp.cls} px-3.5 py-2.5`}>
+          <div className="flex items-baseline justify-between gap-3">
+            <span
+              className="font-mono text-[11px] font-semibold tracking-[0.22em]"
+              style={{ color: "var(--stampc)" }}
+            >
+              {stamp.label}
+            </span>
+            <span className="font-mono text-[10px] tracking-[0.12em] text-ink2">
+              GATE {ev.gate} · ROUND {String(ev.round).padStart(2, "0")}
+            </span>
+          </div>
+          <p className="mt-1.5 text-sm leading-relaxed">{ev.reason}</p>
+        </div>
+      </TimelineRow>
     );
   }
   if (ev.type === "error") {
     return (
-      <div className="flex items-start gap-2 rounded-md border border-slate-200 border-l-4 border-l-red-400 bg-red-50 p-2 text-sm text-red-700 dark:border-slate-800 dark:border-l-red-500 dark:bg-red-950/40 dark:text-red-300">
-        <span aria-hidden="true" className="mt-0.5 shrink-0">
-          ✕
-        </span>
-        <span>运行出错：{ev.message}</span>
-      </div>
+      <TimelineRow className="mt-2" dot="bg-danger">
+        <div className="stamp stamp-degraded px-3.5 py-2.5">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="font-mono text-[11px] font-semibold tracking-[0.22em] text-danger">
+              ERROR
+            </span>
+          </div>
+          <p className="mt-1.5 text-sm leading-relaxed">运行出错：{ev.message}</p>
+        </div>
+      </TimelineRow>
     );
   }
   return null;
@@ -170,61 +198,114 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto flex h-screen max-w-3xl flex-col p-4 sm:p-6">
-      <header className="mb-4 flex items-center gap-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white shadow-sm">
-          S
-        </div>
-        <div>
-          <h1 className="text-lg leading-tight font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Sluice
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            可挂载 Skill 的数据 Agent 平台
-          </p>
+    <div className="flex h-screen flex-col">
+      {/* 头部 = 仪表铭牌 */}
+      <header className="anim-rise shrink-0 border-b border-line">
+        <div className="mx-auto flex h-14 w-full max-w-3xl items-center gap-3 px-4 sm:px-6">
+          <span className="font-mono text-base font-semibold tracking-[0.2em] text-ink uppercase">
+            SLUICE
+          </span>
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 rounded-full bg-accent ${busy ? "breathe" : ""}`}
+          />
+          <span className="font-mono text-xs text-ink2">{busy ? "运行中" : "空闲"}</span>
+          <span className="ml-auto hidden font-mono text-[11px] tracking-[0.08em] text-ink2 sm:block">
+            SKILL-MOUNTED DATA AGENT
+          </span>
         </div>
       </header>
-      <div className="flex-1 space-y-4 overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-        {messages.map((m, i) =>
-          m.role === "user" ? (
-            <div key={i} className="flex justify-end">
-              <div className="max-w-[80%] rounded-2xl rounded-br-md bg-indigo-600 px-4 py-2 text-sm leading-relaxed text-white shadow-sm">
-                {m.text}
+
+      {/* 消息流 = 航行记录时间线 */}
+      <main className="scroll-thin min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 py-6 sm:px-6">
+          {messages.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
+              <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-8 shadow-panel">
+                <div className="font-mono text-2xl font-semibold tracking-[0.24em] text-ink">
+                  SLUICE
+                </div>
+                <p className="mt-2 text-sm text-ink2">输入数据需求，观察 Agent 的每一步</p>
+                <div className="mt-5 flex flex-col gap-2">
+                  {EXAMPLE_COMMANDS.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setInput(t)}
+                      className="cursor-pointer rounded-lg border border-line bg-code px-3 py-2 text-left font-mono text-xs text-ink2 transition-colors hover:border-brand/50 hover:text-brand"
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          ) : m.role === "run" ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/60">
-              <div className="space-y-1">
-                {m.events.map((ev, j) => (
-                  <EventLine key={j} ev={ev} />
-                ))}
-              </div>
-              {m.answer && (
-                <pre className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-sm leading-relaxed whitespace-pre-wrap text-slate-800 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                  {m.answer}
-                </pre>
+          ) : (
+            <div className="space-y-5">
+              {messages.map((m, i) =>
+                m.role === "user" ? (
+                  <div key={i} className="anim-entry flex justify-end">
+                    <div className="max-w-[80%] rounded-[12px] rounded-tr-none bg-brand px-4 py-2.5 text-sm leading-relaxed text-brandfg shadow-panel">
+                      {m.text}
+                    </div>
+                  </div>
+                ) : m.role === "run" ? (
+                  <div key={i} className="relative">
+                    <span
+                      aria-hidden="true"
+                      className="absolute top-2 bottom-2 left-[5px] w-[2px] rounded-full bg-rail"
+                    />
+                    {m.events.map((ev, j) => (
+                      <EventLine key={j} ev={ev} />
+                    ))}
+                    {m.answer && (
+                      <TimelineRow className="mt-4" dot="bg-accent">
+                        <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-panel">
+                          <div className="border-b border-line px-4 py-2">
+                            <span className="font-mono text-[10px] font-semibold tracking-[0.22em] text-accent uppercase">
+                              REPORT
+                            </span>
+                          </div>
+                          <pre className="px-4 py-3 font-sans text-sm leading-relaxed whitespace-pre-wrap text-ink">
+                            {m.answer}
+                          </pre>
+                        </div>
+                      </TimelineRow>
+                    )}
+                  </div>
+                ) : null
               )}
             </div>
-          ) : null
-        )}
-        <div ref={bottomRef} />
-      </div>
-      <div className="mt-4 flex gap-2">
-        <input
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 shadow-sm transition-colors outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:disabled:bg-slate-800/50"
-          value={input}
-          placeholder={busy ? "Agent 运行中…" : "例如：生成上周的数据周报"}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && send()}
-          disabled={busy}
+          )}
+          <div ref={bottomRef} />
+        </div>
+      </main>
+
+      {/* 输入区 = 命令栏（贴底悬浮，上方渐隐过渡） */}
+      <div className="anim-rise-2 relative shrink-0">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-10 right-0 left-0 h-10 bg-linear-to-t from-paper to-transparent"
         />
-        <button
-          className="shrink-0 cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:outline-none active:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={send}
-          disabled={busy}
-        >
-          发送
-        </button>
+        <div className="mx-auto w-full max-w-3xl px-4 pb-5 sm:px-6">
+          <div className="cmdbar flex items-center gap-2 rounded-2xl border border-bar bg-surface p-2 pl-4 shadow-panel">
+            <input
+              className="min-w-0 flex-1 border-0 bg-transparent font-mono text-sm text-ink outline-none placeholder:text-ink2/70 disabled:cursor-not-allowed disabled:opacity-50"
+              value={input}
+              placeholder={busy ? "Agent 运行中…" : "向 Agent 下达数据指令…"}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && send()}
+              disabled={busy}
+            />
+            <button
+              className="shrink-0 cursor-pointer rounded-xl bg-brand px-4 py-2 font-mono text-sm font-medium text-brandfg transition-colors hover:bg-brandhover focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={send}
+              disabled={busy}
+            >
+              发送
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

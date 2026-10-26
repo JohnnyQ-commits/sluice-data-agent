@@ -1,6 +1,96 @@
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
 @import "tailwindcss";
 
-/* ---------- 全局基调：浅色专业风 + 基本暗色适配 ---------- */
+/* ---------- 字体令牌 ---------- */
+
+@theme {
+  --font-sans:
+    "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC",
+    ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+/* ---------- 色板：运行时变量（light 默认 / dark 跟随系统）---------- */
+
+:root {
+  --paper: #f6f5f1; /* 页面底：暖纸 */
+  --surface: #ffffff; /* 卡面 */
+  --code: #f3f2ee; /* 代码块内嵌底 */
+  --ink: #1c2433; /* 墨色正文 */
+  --ink2: #5c6672; /* 次要文字 */
+  --brand: #1f3a5f; /* 墨蓝：品牌/聚焦/链接 */
+  --brandfg: #ffffff; /* 墨蓝底上的前景 */
+  --brandhover: #16304f;
+  --brandsoft: rgba(31, 58, 95, 0.07);
+  --accent: #e8590c; /* 信号橙：品牌点/运行态/拦截 */
+  --accentsoft: rgba(232, 89, 12, 0.08);
+  --ok: #2f9e44; /* 自修 */
+  --oksoft: rgba(47, 158, 68, 0.09);
+  --danger: #e03131; /* 降级 */
+  --dangersoft: rgba(224, 49, 49, 0.08);
+
+  --grid: rgba(28, 36, 51, 0.03); /* 蓝图网格 */
+  --line: rgba(28, 36, 51, 0.1); /* 统一边框 墨@10% */
+  --rail: rgba(28, 36, 51, 0.08); /* 时间线竖轨 */
+  --bar: rgba(28, 36, 51, 0.12); /* 命令栏边框 */
+  --elev: 0 1px 2px rgba(28, 36, 51, 0.06); /* 极轻阴影 */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #10151c;
+    --surface: #161d26;
+    --code: #0c1016;
+    --ink: #e6e9ee;
+    --ink2: #94a0b0;
+    --brand: #7fa6d9;
+    --brandfg: #0e1520;
+    --brandhover: #94bcec;
+    --brandsoft: rgba(127, 166, 217, 0.1);
+    --accent: #ff9a57;
+    --accentsoft: rgba(255, 154, 87, 0.1);
+    --ok: #51cf66;
+    --oksoft: rgba(81, 207, 102, 0.1);
+    --danger: #ff6b6b;
+    --dangersoft: rgba(255, 107, 107, 0.1);
+
+    --grid: rgba(230, 233, 238, 0.03);
+    --line: rgba(230, 233, 238, 0.12);
+    --rail: rgba(230, 233, 238, 0.1);
+    --bar: rgba(230, 233, 238, 0.14);
+    --elev: 0 1px 2px rgba(0, 0, 0, 0.45);
+  }
+}
+
+/* 变量桥接为 Tailwind 工具类（inline：引用运行时变量，暗色自动切换） */
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-code: var(--code);
+  --color-ink: var(--ink);
+  --color-ink2: var(--ink2);
+  --color-brand: var(--brand);
+  --color-brandfg: var(--brandfg);
+  --color-brandhover: var(--brandhover);
+  --color-brandsoft: var(--brandsoft);
+  --color-accent: var(--accent);
+  --color-ok: var(--ok);
+  --color-danger: var(--danger);
+  --color-line: var(--line);
+  --color-rail: var(--rail);
+  --color-bar: var(--bar);
+  --shadow-panel: var(--elev);
+}
+
+/* ---------- 全局基调 ---------- */
 
 @layer base {
   html {
@@ -8,31 +98,138 @@
   }
 
   body {
-    @apply bg-slate-100 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
-    font-family:
-      ui-sans-serif,
-      system-ui,
-      -apple-system,
-      "Segoe UI",
-      "PingFang SC",
-      "Microsoft YaHei",
-      sans-serif;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    background-color: var(--paper);
+    /* 蓝图坐标纸：24px 方格，淡到不抢内容 */
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        var(--grid) 0,
+        var(--grid) 1px,
+        transparent 1px,
+        transparent 24px
+      ),
+      repeating-linear-gradient(
+        to right,
+        var(--grid) 0,
+        var(--grid) 1px,
+        transparent 1px,
+        transparent 24px
+      );
   }
 
   ::selection {
-    @apply bg-indigo-200 text-indigo-900 dark:bg-indigo-900 dark:text-indigo-100;
+    background: color-mix(in srgb, var(--brand) 22%, transparent);
   }
 
-  /* 代码块 / 观察输出的滚动条：细、不抢眼，横向滚动防撑破 */
-  pre::-webkit-scrollbar,
-  details pre::-webkit-scrollbar {
+  /* 细滚动条：主滚动区 + 代码块 */
+  main::-webkit-scrollbar,
+  pre::-webkit-scrollbar {
     height: 6px;
     width: 6px;
   }
+  main::-webkit-scrollbar-thumb,
   pre::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-slate-300 dark:bg-slate-700;
+    background: var(--bar);
+    border-radius: 9999px;
   }
+  main::-webkit-scrollbar-track,
   pre::-webkit-scrollbar-track {
-    @apply bg-transparent;
+    background: transparent;
+  }
+}
+
+/* ---------- 门禁盖章卡片：检验印章质感 ---------- */
+
+.stamp {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--stampc);
+  border-radius: 8px;
+  background: var(--stampbg);
+  box-shadow: var(--elev);
+}
+.stamp-blocked {
+  --stampc: var(--accent); /* 拦截 = 信号橙（与品牌统一） */
+  --stampbg: var(--accentsoft);
+}
+.stamp-repaired {
+  --stampc: var(--ok);
+  --stampbg: var(--oksoft);
+}
+.stamp-degraded {
+  --stampc: var(--danger);
+  --stampbg: var(--dangersoft);
+}
+
+/* ---------- 命令栏：聚焦墨蓝 ring + 上浮 ---------- */
+
+.cmdbar {
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+.cmdbar:focus-within {
+  border-color: var(--brand);
+  box-shadow:
+    0 0 0 3px var(--brandsoft),
+    var(--elev);
+}
+
+/* ---------- 动效 ---------- */
+
+@keyframes sluice-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sluice-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sluice-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.anim-rise {
+  animation: sluice-rise 240ms ease-out both;
+}
+.anim-rise-2 {
+  animation: sluice-rise 240ms ease-out 60ms both;
+}
+.anim-entry {
+  animation: sluice-slide-in 180ms ease-out both;
+}
+.breathe {
+  animation: sluice-breathe 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise,
+  .anim-rise-2,
+  .anim-entry,
+  .breathe {
+    animation: none;
+  }
+  .cmdbar {
+    transition: none;
   }
 }
