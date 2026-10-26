@@ -266,6 +266,9 @@ export default function App() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [theme, setTheme] = useState(() => {
+    // 深链 ?theme=light|dark 优先（分享/截图用），其次本地持久化
+    const qp = new URLSearchParams(window.location.search).get("theme");
+    if (qp === "light" || qp === "dark") return qp;
     try {
       return localStorage.getItem(THEME_KEY) || "system";
     } catch {
@@ -328,7 +331,10 @@ export default function App() {
         return null;
       }
     })();
-    if (last) openConversation(last);
+    // 深链：?c=<会话id> 直接打开该会话（优先于上次会话恢复）
+    const deep = new URLSearchParams(window.location.search).get("c");
+    if (deep) openConversation(deep);
+    else if (last) openConversation(last);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅首挂载执行
   }, []);
 
