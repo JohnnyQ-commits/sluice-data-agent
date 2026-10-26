@@ -57,6 +57,13 @@ const ICONS = {
   plus: <path d="M12 5v14M5 12h14" />,
   trash: <path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13M10 11v6m4-6v6" />,
   check: <path d="M5 12l5 5 9-9" />,
+  chevron: <path d="M6 9l6 6 6-6" />,
+  box: (
+    <>
+      <path d="M21 8 12 3 3 8v8l9 5 9-5z" />
+      <path d="M3 8l9 5 9-5M12 13v8" />
+    </>
+  ),
 };
 
 /* 历史会话相对时间 */
@@ -198,6 +205,11 @@ export default function App() {
     }
   });
   const [confirmDel, setConfirmDel] = useState(null);
+  const [skills, setSkills] = useState([]);
+  const [openSkill, setOpenSkill] = useState(null); // 展开详情的 skill 名
+  const [mountInput, setMountInput] = useState(""); // 挂载路径输入框显隐 + 值
+  const [mountMsg, setMountMsg] = useState(null); // { ok, text } 服务端具体原因原样可见
+  const [confirmUnskill, setConfirmUnskill] = useState(null); // 二击确认卸载的 skill 名
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -221,8 +233,15 @@ export default function App() {
       .then((d) => setConvos(d.conversations || []))
       .catch(() => {});
   }
+  function loadSkills() {
+    fetch("/api/skills")
+      .then((r) => r.json())
+      .then((d) => setSkills(d.skills || []))
+      .catch(() => {});
+  }
   useEffect(() => {
     loadConvos();
+    loadSkills();
     const last = (() => {
       try {
         return localStorage.getItem(ACTIVE_CONV_KEY);
@@ -280,6 +299,49 @@ export default function App() {
     if (id === activeId) {
       setMessages([]);
       rememberActive(null);
+    }
+  }
+
+  async function mountSkill() {
+    const p = mountInput.trim();
+    if (!p) return;
+    setMountMsg(null);
+    try {
+      const resp = await fetch("/api/skills/mount", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: p }),
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        setMountInput("");
+        setMountMsg({ ok: true, text: `已挂载 ${data.name}（${data.tools} 个工具）` });
+        loadSkills();
+      } else {
+        setMountMsg({ ok: false, text: data.error || "挂载失败" });
+      }
+    } catch (err) {
+      setMountMsg({ ok: false, text: "网络失败: " + err.message });
+    }
+  }
+
+  async function unloadSkill(name) {
+    if (confirmUnskill !== name) {
+      setConfirmUnskill(name);
+      return;
+    }
+    setConfirmUnskill(null);
+    try {
+      const resp = await fetch(`/api/skills/${name}`, { method: "DELETE" });
+      if (!resp.ok) {
+        const data = await resp.json();
+        setMountMsg({ ok: false, text: data.error || "卸载失败" });
+      } else {
+        setMountMsg({ ok: true, text: `已卸载 ${name}` });
+        loadSkills();
+      }
+    } catch (err) {
+      setMountMsg({ ok: false, text: "网络失败: " + err.message });
     }
   }
 
@@ -425,6 +487,125 @@ export default function App() {
               ))
             )}
           </nav>
+
+          {/* SKILLS 区块：查看 + 本地目录挂载（只读展示 + 安全校验原因原样可见） */}
+          <div className="shrink-0 border-t border-[color:var(--hairline)] px-2 pt-2.5 pb-3">
+            <div className="flex items-center gap-2 px-2">
+              <span className="font-mono text-[10px] font-semibold tracking-[0.2em] text-ink2 uppercase">
+                Skills
+              </span>
+              <span className="font-mono text-[10px] text-ink2">{skills.length}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setMountInput((v) => (v === null ? "" : null));
+                  setMountMsg(null);
+                }}
+                className="ml-auto cursor-pointer rounded-md p-1 text-ink2 transition-colors hover:text-brand"
+                aria-label="挂载本地 Skill 目录"
+                title="挂载本地 Skill 目录"
+              >
+                <Icon path={ICONS.plus} className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {mountInput !== null && (
+              <div className="mt-1.5 px-1">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    value={mountInput}
+                    onChange={(e) => setMountInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && mountSkill()}
+                    placeholder="服务器本地绝对路径，如 E:\skills\my-skill"
+                    className="min-w-0 flex-1 rounded-lg border border-bar bg-paper px-2.5 py-1.5 font-mono text-xs text-ink outline-none placeholder:text-ink2/60 focus:border-brand"
+                  />
+                  <button
+                    type="button"
+                    onClick={mountSkill}
+                    className="shrink-0 cursor-pointer rounded-lg bg-brand px-2.5 py-1.5 font-mono text-xs text-brandfg transition-colors hover:bg-brandhover"
+                  >
+                    挂载
+                  </button>
+                </div>
+                {mountMsg && (
+                  <p
+                    className={`mt-1.5 rounded-md px-2 py-1.5 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap ${
+                      mountMsg.ok ? "text-ok" : "text-danger"
+                    }`}
+                  >
+                    {mountMsg.text}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="mt-1">
+              {skills.map((s) => (
+                <div key={s.name} className="group/skill relative">
+                  <button
+                    type="button"
+                    onClick={() => setOpenSkill((o) => (o === s.name ? null : s.name))}
+                    className={`flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left transition-colors ${
+                      openSkill === s.name ? "bg-brandsoft" : "hover:bg-paper"
+                    }`}
+                  >
+                    <Icon path={ICONS.box} className="h-3.5 w-3.5 shrink-0 text-ink2" />
+                    <span className="min-w-0 flex-1 truncate font-mono text-xs text-ink">
+                      {s.name}
+                    </span>
+                    <span className="shrink-0 font-mono text-[10px] text-ink2">
+                      {s.tools.length} 工具
+                    </span>
+                    <Icon
+                      path={ICONS.chevron}
+                      className={`h-3 w-3 shrink-0 text-ink2 transition-transform ${
+                        openSkill === s.name ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                  {s.user_mounted && (
+                    <button
+                      type="button"
+                      aria-label={confirmUnskill === s.name ? "确认卸载" : "卸载"}
+                      onClick={() => unloadSkill(s.name)}
+                      onMouseLeave={() => setConfirmUnskill((u) => (u === s.name ? null : u))}
+                      className={`absolute top-1/2 right-1.5 -translate-y-1/2 cursor-pointer rounded-md p-1 transition-colors ${
+                        confirmUnskill === s.name
+                          ? "text-danger opacity-100"
+                          : "text-ink2 opacity-0 hover:text-danger group-hover/skill:opacity-100"
+                      }`}
+                    >
+                      <Icon
+                        path={confirmUnskill === s.name ? ICONS.check : ICONS.trash}
+                        className="h-3 w-3"
+                      />
+                    </button>
+                  )}
+                  {openSkill === s.name && (
+                    <div className="mt-1 rounded-xl border border-line bg-paper px-3 py-2.5">
+                      <p className="text-xs leading-relaxed text-ink">{s.description}</p>
+                      {s.output_contract.length > 0 && (
+                        <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink2">
+                          契约：{s.output_contract.join(" · ")}
+                        </p>
+                      )}
+                      {s.tools.length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                          {s.tools.map((t) => (
+                            <li key={t.name} className="text-[11px] leading-snug text-ink2">
+                              <span className="font-mono text-ink">{t.name}</span>
+                              {t.description ? ` — ${t.description}` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <p className="mt-2 font-mono text-[10px] text-ink2">
+                        评测 {s.evals} 条{s.user_mounted ? " · 用户挂载" : " · 内置"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </aside>
       )}
 

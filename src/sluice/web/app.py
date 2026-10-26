@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import queue
+import re
+import shutil
 import threading
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request, send_from_directory
@@ -20,13 +23,15 @@ from ..memory.session import SessionStore
 from ..memory.store import FaissStore, GatewayEmbedder, HashEmbedder
 from ..runtime.loop import ReActRuntime
 from ..runtime.prompt import build_system
-from ..skills.loader import SkillLoader
+from ..skills.loader import SkillLoader, parse_skill_md
 from ..tools.query_data import QueryDataTool
 from ..tools.registry import ToolRegistry
 from ..web.conversations import ConversationStore
+from ..web.skill_audit import audit_tools_py
 
 _FRONTEND_DIST = Path(__file__).resolve().parents[3] / "web" / "frontend" / "dist"
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+_SKILL_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*\Z")  # 目录名 = skill 名，防路径穿越
 
 # web 壳无账号体系：单机固定用户 + 单滚动会话（跨消息累积轮次，超限才摘要升维）
 _MEMORY_USER_ID = "local"
@@ -145,6 +150,13 @@ def create_app(
         guardrails=guardrails,
     )
 
+    # Skill 挂载：热注册目标必须是运行时实际持有的工具池（外部注入 runtime 时保持同一实例）
+    app.config["RUNTIME_REGISTRY"] = runtime.registry
+    app.config["SLUICE_SKILLS_DIR"] = str(skills_dir) if skills_dir else None
+
+    def _runtime_registry() -> ToolRegistry:
+        return runtime.registry
+
     runs: dict[str, queue.Queue] = {}
 
     @app.post("/api/chat")
@@ -251,9 +263,86 @@ def create_app(
 
     @app.get("/api/skills")
     def skills():
-        return jsonify(
-            {"skills": [{"name": p.name, "description": p.description} for p in packages]}
-        )
+        def payload(p):
+            return {
+                "name": p.name,
+                "description": p.description,
+                "output_contract": p.output_contract,
+                "tools": [{"name": t.name, "description": t.description} for t in p.tools],
+                "evals": len(p.evals),
+                "user_mounted": (p.path / "_mounted.json").is_file(),
+            }
+
+        return jsonify({"skills": [payload(p) for p in packages]})
+
+    @app.post("/api/skills/mount")
+    def mount_skill():
+        body = request.get_json(silent=True) or {}
+        raw = (body.get("path") or "").strip()
+        if not raw:
+            return jsonify({"error": "path 必填（服务器本地绝对路径）"}), 400
+        src = Path(raw)
+        if not src.is_absolute():
+            return jsonify({"error": "path 必须为服务器本地绝对路径"}), 400
+        src = src.resolve()
+        if not src.is_dir():
+            return jsonify({"error": f"目录不存在: {src}"}), 400
+        name = src.name
+        if not _SKILL_NAME_RE.fullmatch(name):
+            return jsonify({"error": f"目录名不合法（仅字母/数字/-/_，防路径穿越）: {name}"}), 400
+        md = src / "SKILL.md"
+        if not md.is_file():
+            return jsonify({"error": "缺少 SKILL.md"}), 400
+        meta = parse_skill_md(md.read_text(encoding="utf-8-sig"))
+        if not meta.get("name"):
+            return jsonify({"error": "SKILL.md frontmatter 缺少 name"}), 400
+        if meta["name"] != name:
+            return jsonify(
+                {"error": f"frontmatter name（{meta['name']}）与目录名（{name}）不一致"}
+            ), 400
+        if any(p.name == name for p in packages):
+            return jsonify({"error": f"已挂载同名 Skill，拒绝重名: {name}"}), 400
+        tools_py = src / "tools.py"
+        if tools_py.is_file():
+            violations = audit_tools_py(tools_py, src)
+            if violations:
+                return jsonify({"error": "安全校验未通过:\n" + "\n".join(violations)}), 400
+        skills_root = app.config.get("SLUICE_SKILLS_DIR")
+        if not skills_root:
+            return jsonify({"error": "应用未启用 skills 目录，无法挂载"}), 400
+        dest = Path(skills_root) / name
+        if dest.exists():
+            return jsonify({"error": f"skills 目录已存在同名目录: {name}"}), 400
+        try:
+            shutil.copytree(src, dest)
+            (dest / "_mounted.json").write_text(
+                json.dumps(
+                    {"source": str(src), "mounted_at": datetime.now().isoformat()},
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            pkg = SkillLoader().load_package(dest, _runtime_registry())
+        except Exception as exc:  # noqa: BLE001 — 复制/加载失败回滚，不留半挂载
+            shutil.rmtree(dest, ignore_errors=True)
+            return jsonify({"error": f"挂载失败: {exc}"}), 400
+        if pkg is None:
+            shutil.rmtree(dest, ignore_errors=True)
+            return jsonify({"error": "Skill 加载失败（详见服务端日志）"}), 400
+        packages.append(pkg)
+        return jsonify({"name": pkg.name, "tools": len(pkg.tools)})
+
+    @app.delete("/api/skills/<name>")
+    def unload_skill(name: str):
+        pkg = next((p for p in packages if p.name == name), None)
+        if pkg is None:
+            return jsonify({"error": "Skill 不存在"}), 404
+        if not (pkg.path / "_mounted.json").is_file():
+            return jsonify({"error": f"{name} 为内置 Skill，禁止卸载"}), 403
+        _runtime_registry().unregister_owner(name)
+        shutil.rmtree(pkg.path, ignore_errors=True)
+        packages.remove(pkg)
+        return jsonify({"ok": True})
 
     @app.get("/")
     def index():

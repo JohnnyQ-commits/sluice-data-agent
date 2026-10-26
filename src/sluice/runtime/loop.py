@@ -53,6 +53,11 @@ class ReActRuntime:
         self._guardrails = guardrails
         self.trace: list[dict] = []  # 每轮轨迹，P1 经 SSE 推给前端
 
+    @property
+    def registry(self) -> ToolRegistry:
+        """运行时持有的工具池（web 挂载端点热注册目标）。"""
+        return self._registry
+
     def run(
         self,
         user_input: str,

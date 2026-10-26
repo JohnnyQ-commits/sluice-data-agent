@@ -75,6 +75,44 @@ def _load_tools(py_path: Path, skill_name: str) -> list[Tool]:
 
 
 class SkillLoader:
+    def load_package(self, d: Path, registry: ToolRegistry | None = None) -> SkillPackage | None:
+        """加载单个 skill 目录（挂载端点热注册复用）；失败返回 None。"""
+        md = d / "SKILL.md"
+        if not md.is_file():
+            return None
+        try:
+            # utf-8-sig：容忍编辑器写入的 UTF-8 BOM，否则 ﻿ 破坏 frontmatter 匹配
+            meta = parse_skill_md(md.read_text(encoding="utf-8-sig"))
+            if not meta.get("name"):
+                return None
+            tools = _load_tools(d / "tools.py", meta["name"]) if (d / "tools.py").is_file() else []
+            evals_path = d / "evals" / "cases.py"
+            evals: list = []
+            if evals_path.is_file():
+                raw_cases = _exec_module(evals_path, meta["name"], "CASES")
+                if isinstance(raw_cases, list):
+                    evals = list(raw_cases)
+                elif raw_cases is not None:
+                    logger.warning("evals/cases.py 的 CASES 应为 list，已忽略: %s", d.name)
+        except Exception as e:  # noqa: BLE001 - 单包异常不殃及其他 skill
+            logger.warning("Skill 包加载失败，已跳过 %s: %s", d.name, e)
+            return None
+        for t in tools:
+            t.name = f"{meta['name']}.{t.name}"
+            t.owner_skill = meta["name"]
+            if registry is not None:
+                registry.register(t)
+        return SkillPackage(
+            name=meta["name"],
+            description=meta.get("description", ""),
+            path=d,
+            tools=tools,
+            evals=evals,
+            output_contract=[
+                s.strip() for s in meta.get("output_contract", "").split(";") if s.strip()
+            ],
+        )
+
     def load(
         self, skills_dir: str | Path, registry: ToolRegistry | None = None
     ) -> list[SkillPackage]:
@@ -83,43 +121,7 @@ class SkillLoader:
             return []
         packages: list[SkillPackage] = []
         for d in sorted(p for p in root.iterdir() if p.is_dir()):
-            md = d / "SKILL.md"
-            if not md.is_file():
-                continue
-            try:
-                # utf-8-sig：容忍编辑器写入的 UTF-8 BOM，否则 ﻿ 破坏 frontmatter 匹配
-                meta = parse_skill_md(md.read_text(encoding="utf-8-sig"))
-                if not meta.get("name"):
-                    continue
-                tools = (
-                    _load_tools(d / "tools.py", meta["name"]) if (d / "tools.py").is_file() else []
-                )
-                evals_path = d / "evals" / "cases.py"
-                evals: list = []
-                if evals_path.is_file():
-                    raw_cases = _exec_module(evals_path, meta["name"], "CASES")
-                    if isinstance(raw_cases, list):
-                        evals = list(raw_cases)
-                    elif raw_cases is not None:
-                        logger.warning("evals/cases.py 的 CASES 应为 list，已忽略: %s", d.name)
-            except Exception as e:  # noqa: BLE001 - 单包异常不殃及其他 skill
-                logger.warning("Skill 包加载失败，已跳过 %s: %s", d.name, e)
-                continue
-            for t in tools:
-                t.name = f"{meta['name']}.{t.name}"
-                t.owner_skill = meta["name"]
-                if registry is not None:
-                    registry.register(t)
-            packages.append(
-                SkillPackage(
-                    name=meta["name"],
-                    description=meta.get("description", ""),
-                    path=d,
-                    tools=tools,
-                    evals=evals,
-                    output_contract=[
-                        s.strip() for s in meta.get("output_contract", "").split(";") if s.strip()
-                    ],
-                )
-            )
+            pkg = self.load_package(d, registry)
+            if pkg is not None:
+                packages.append(pkg)
         return packages

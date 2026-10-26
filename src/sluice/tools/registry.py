@@ -15,6 +15,17 @@ class ToolRegistry:
             raise ValueError(f"工具重复注册: {tool.name}")
         self._tools[tool.name] = tool
 
+    def unregister(self, name: str) -> bool:
+        """注销单个工具（Skill 卸载用）；不存在返回 False。"""
+        return self._tools.pop(name, None) is not None
+
+    def unregister_owner(self, owner_skill: str) -> int:
+        """注销某 Skill 名下的全部私有工具，返回注销数。"""
+        names = [n for n, t in self._tools.items() if t.owner_skill == owner_skill]
+        for n in names:
+            del self._tools[n]
+        return len(names)
+
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)
 
