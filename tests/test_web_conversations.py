@@ -2,11 +2,13 @@
 
 import json
 import threading
+from typing import ClassVar
 
 import pytest
 
 from sluice.llm.types import LLMResponse, TextBlock
 from sluice.runtime.loop import ReActRuntime
+from sluice.tools.base import Tool, ToolResult
 from sluice.tools.registry import ToolRegistry
 from sluice.web.app import create_app
 from sluice.web.conversations import ConversationStore
@@ -146,7 +148,8 @@ def test_chat_without_conversation_id_creates_and_persists(conv_app, tmp_path):
     assert len(turns) == 1
     assert turns[0]["user"] == "你好"
     assert turns[0]["answer"] == "完成"
-    assert turns[0]["events"][0]["type"] == "round_start"
+    assert turns[0]["events"][0]["type"] == "session_init"
+    assert turns[0]["events"][1]["type"] == "round_start"
     assert turns[0]["events"][-1]["type"] != "final"  # final 不进轨迹（answer 单独存）
     # 落盘文件可独立解析（原子写产物）
     on_disk = json.loads((tmp_path / "convs" / f"{conv_id}.json").read_text(encoding="utf-8"))
@@ -203,3 +206,51 @@ def test_chat_error_event_still_persists_turn(tmp_path):
     assert conv["messages"][0]["answer"] is None
     assert any(e["type"] == "error" for e in conv["messages"][0]["events"])
     assert client.get("/api/conversations").get_json()["conversations"][0]["title"] == "触发报错"
+
+
+# ---------------- session_init 开场事件（可观测性） ----------------
+
+
+class DummyTool(Tool):
+    name = "dummy"
+    description = "测试工具"
+    parameters: ClassVar[dict] = {"type": "object", "properties": {}}
+
+    def execute(self, args):
+        return ToolResult("ok")
+
+
+def test_stream_first_event_is_session_init():
+    """stream 首个事件是 session_init：字段完整，tools 与 registry 全量一致。"""
+    reg = ToolRegistry()
+    reg.register(DummyTool())
+    app = create_app(
+        runtime=ReActRuntime(EchoClient(), reg),
+        skills_dir=None,
+        conversations_dir=None,
+    )
+    app.config["TESTING"] = True
+    client = app.test_client()
+    resp = client.post("/api/chat", json={"message": "你好"})
+    body = client.get(f"/api/stream/{resp.get_json()['run_id']}").get_data(as_text=True)
+    first = json.loads(body.split("data: ", 2)[1].split("\n")[0])
+    assert first["type"] == "session_init"
+    assert first["model"]  # settings 提供的模型名非空
+    assert first["skills"] == []  # skills_dir=None → 无 Skill
+    assert [t["name"] for t in first["tools"]] == ["dummy"]
+    assert first["tools"][0]["description"] == "测试工具"
+    assert first["guardrails"] is False  # 裸 runtime 未挂门禁链
+    assert first["max_rounds"] == 10  # ReActRuntime 默认循环上限
+
+
+def test_session_init_persisted_in_turn(conv_app):
+    """session_init 进持久化轮次：回放历史会话时可见。"""
+    client = conv_app.test_client()
+    resp = client.post("/api/chat", json={"message": "开场快照"})
+    conv_id = resp.get_json()["conversation_id"]
+    _finish(client, resp.get_json()["run_id"])
+    conv = client.get(f"/api/conversations/{conv_id}").get_json()
+    events = conv["messages"][0]["events"]
+    assert events[0]["type"] == "session_init"
+    assert events[0]["max_rounds"] == 10
+    assert isinstance(events[0]["tools"], list)

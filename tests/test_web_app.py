@@ -80,6 +80,7 @@ def test_stream_delivers_events_then_end(app):
         if line.startswith("data: ") and line[len("data: ") :] != "{}"
     ]
     assert [e["type"] for e in events] == [
+        "session_init",
         "round_start",
         "tool_call",
         "observation",
@@ -87,8 +88,8 @@ def test_stream_delivers_events_then_end(app):
         "final",
     ]
     assert events[-1]["answer"] == "完成"
-    assert events[2]["observation"] == "done"
-    assert events[2]["is_error"] is False
+    assert events[3]["observation"] == "done"
+    assert events[3]["is_error"] is False
     assert "event: end" in body
     assert resp.headers["Cache-Control"] == "no-cache"
     assert resp.headers["X-Accel-Buffering"] == "no-cache"
@@ -156,6 +157,7 @@ def test_memory_init_failure_degrades_to_memoryless(monkeypatch, tmp_path):
     app.config["RELEASE"].set()
     events, body = _read_stream(client, run_id)
     assert [e["type"] for e in events] == [
+        "session_init",
         "round_start",
         "tool_call",
         "observation",

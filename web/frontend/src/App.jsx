@@ -89,6 +89,66 @@ function turnsToMessages(turns) {
 }
 
 function EventLine({ ev }) {
+  if (ev.type === "session_init") {
+    return (
+      <TimelineRow className="mt-2" dot="bg-ink2">
+        <details className="group py-0.5">
+          <summary className="inline-flex cursor-pointer list-none flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-ink2 transition-colors hover:text-ink">
+            <span
+              aria-hidden="true"
+              className="inline-block w-3 text-center text-xs transition-transform group-open:rotate-90"
+            >
+              ▸
+            </span>
+            <span className="text-[11px] font-semibold tracking-[0.08em] uppercase">System Init</span>
+            <span aria-hidden="true" className="h-px w-4 bg-rail" />
+            <span>模型 {ev.model}</span>
+            <span aria-hidden="true">·</span>
+            <span>工具 {(ev.tools || []).length} 个</span>
+            <span aria-hidden="true">·</span>
+            <span>门禁{ev.guardrails ? "开启" : "关闭"}</span>
+          </summary>
+          <div className="mt-2 space-y-3 rounded-lg border border-line bg-surface px-3.5 py-3">
+            <div>
+              <p className="text-[10px] tracking-[0.05em] text-ink2 uppercase">模型 / Skills</p>
+              <div className="mt-1 flex flex-wrap gap-1">
+                <span className="rounded-md border border-brand/30 bg-brandsoft px-1.5 py-0.5 text-xs font-medium text-brand">
+                  {ev.model}
+                </span>
+                {(ev.skills || []).map((s) => (
+                  <span
+                    key={s}
+                    className="rounded-md border border-line bg-paper px-1.5 py-0.5 text-xs text-ink2"
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] tracking-[0.05em] text-ink2 uppercase">
+                工具清单（{(ev.tools || []).length}）
+              </p>
+              <div className="mt-1 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                {(ev.tools || []).map((t) => (
+                  <div key={t.name} className="min-w-0 text-xs leading-snug">
+                    <span className="font-medium text-ink">{t.name}</span>
+                    <span className="ml-1.5 text-ink2">{t.description}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] tracking-[0.05em] text-ink2 uppercase">运行参数</p>
+              <p className="mt-1 text-xs text-ink2">
+                max_rounds = {ev.max_rounds}（推理循环上限）
+              </p>
+            </div>
+          </div>
+        </details>
+      </TimelineRow>
+    );
+  }
   if (ev.type === "round_start") {
     return (
       <TimelineRow className="mt-6 first:mt-0" dot="bg-brand">

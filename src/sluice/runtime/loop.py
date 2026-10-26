@@ -58,6 +58,16 @@ class ReActRuntime:
         """运行时持有的工具池（web 挂载端点热注册目标）。"""
         return self._registry
 
+    @property
+    def max_rounds(self) -> int:
+        """循环上限（web session_init 事件展示用）。"""
+        return self._max_rounds
+
+    @property
+    def guardrails(self) -> GuardrailChain | None:
+        """门禁链（None = 未启用；web session_init 事件展示用）。"""
+        return self._guardrails
+
     def run(
         self,
         user_input: str,

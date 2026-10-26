@@ -157,6 +157,34 @@ def create_app(
     def _runtime_registry() -> ToolRegistry:
         return runtime.registry
 
+    def _session_init(message: str) -> dict:
+        """开场事件：本次运行的可观测性快照。
+
+        skills 取 system prompt 实际注入的清单（memory 召回可能筛出子集，
+        与 _memory_system 同源同逻辑）；tools 以 registry 为唯一真相源全量遍历。
+        """
+        skills = [p.name for p in packages]
+        if memory is not None and vectors is not None:
+            try:
+                picked = select_skills(
+                    packages, message, vectors, settings.memory_skill_match_threshold
+                )
+                if picked is not None:
+                    skills = [p.name for p in picked]
+            except Exception:  # noqa: BLE001 — 召回失败按全量报告，不拖垮开场
+                logger.warning("session_init 召回 Skill 子集失败，按全量报告")
+        return {
+            "type": "session_init",
+            "model": settings.llm_model,
+            "skills": skills,
+            "tools": [
+                {"name": d.name, "description": d.description}
+                for d in runtime.registry.to_defs()
+            ],
+            "guardrails": runtime.guardrails is not None,
+            "max_rounds": runtime.max_rounds,
+        }
+
     runs: dict[str, queue.Queue] = {}
 
     @app.post("/api/chat")
@@ -183,6 +211,10 @@ def create_app(
                 q.put(ev)
 
             try:
+                # 开场先发 session_init（模型/Skill/工具清单/门禁/轮次上限），
+                # 经同一 tee 通道进轨迹与落盘，回放时可见；数据取自 web 层已持有的
+                # settings/runtime/registry，runtime.run 签名与 CLI 语义零变化
+                tee(_session_init(body["message"]))
                 # runtime 会 emit final / error 事件，worker 不重复发
                 answer = runtime.run(
                     body["message"], on_event=tee, system=_memory_system(body["message"])
