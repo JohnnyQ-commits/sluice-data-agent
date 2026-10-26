@@ -22,14 +22,14 @@ function TimelineRow({ className, dot, children }) {
   );
 }
 
-/* 极简线性图标（零依赖） */
+/* 极简线性图标（零依赖，1.5px 线宽统一） */
 function Icon({ path, className = "h-4 w-4" }) {
   return (
     <svg
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -162,7 +162,7 @@ function EventLine({ ev }) {
               GATE {ev.gate} · ROUND {String(ev.round).padStart(2, "0")}
             </span>
           </div>
-          <p className="mt-2 text-sm leading-relaxed">{ev.reason}</p>
+          <p className="mt-2 text-[15px] leading-[1.7]">{ev.reason}</p>
         </div>
       </TimelineRow>
     );
@@ -435,12 +435,13 @@ export default function App() {
               type="button"
               onClick={newConversation}
               disabled={busy}
-              className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-xl border border-line bg-paper px-3 py-2 text-sm text-ink transition-colors hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border border-brand/30 bg-brandsoft px-3 py-2.5 text-sm font-medium text-brand transition-colors duration-150 hover:border-brand/60 hover:bg-brand/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Icon path={ICONS.plus} className="h-4 w-4 shrink-0" />
               <span className="truncate">新对话</span>
             </button>
           </div>
+          <p className="px-4 pt-2 pb-1.5 text-xs text-ink2">会话历史</p>
           <nav className="scroll-thin min-h-0 flex-1 overflow-y-auto px-2 pb-4">
             {convos.length === 0 ? (
               <p className="px-2 pt-4 text-center text-xs text-ink2">暂无历史对话</p>
@@ -491,9 +492,7 @@ export default function App() {
           {/* SKILLS 区块：查看 + 本地目录挂载（只读展示 + 安全校验原因原样可见） */}
           <div className="shrink-0 border-t border-[color:var(--hairline)] px-2 pt-2.5 pb-3">
             <div className="flex items-center gap-2 px-2">
-              <span className="font-mono text-[10px] font-semibold tracking-[0.2em] text-ink2 uppercase">
-                Skills
-              </span>
+              <span className="text-xs text-ink2">Skills</span>
               <span className="font-mono text-[10px] text-ink2">{skills.length}</span>
               <button
                 type="button"
@@ -521,7 +520,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={mountSkill}
-                    className="shrink-0 cursor-pointer rounded-lg bg-brand px-2.5 py-1.5 font-mono text-xs text-brandfg transition-colors hover:bg-brandhover"
+                    className="shrink-0 cursor-pointer rounded-lg bg-brand px-2.5 py-1.5 font-mono text-xs text-brandfg transition-colors duration-150 hover:bg-brandhover"
                   >
                     挂载
                   </button>
@@ -662,8 +661,8 @@ export default function App() {
           <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col border-x border-[color:var(--hairline)] bg-surface px-4 py-10 sm:px-6">
             {messages.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center py-20 text-center">
-                <h2 className="text-2xl font-semibold text-ink">你好，我是 Sluice</h2>
-                <p className="mt-3 text-sm text-ink2">下达数据指令，每一步都可见、可信</p>
+                <h2 className="text-3xl font-semibold text-ink">你好，我是 Sluice</h2>
+                <p className="mt-3 text-[15px] text-ink2">下达数据指令，每一步都可见、可信</p>
                 <div className="mt-8 flex w-full max-w-md flex-col gap-2.5">
                   {EXAMPLE_COMMANDS.map((t) => (
                     <button
@@ -682,7 +681,7 @@ export default function App() {
                 {messages.map((m, i) =>
                   m.role === "user" ? (
                     <div key={i} className="anim-entry flex justify-end">
-                      <div className="max-w-[80%] rounded-[18px] border border-brand/15 bg-brandsoft px-5 py-3 text-sm leading-relaxed text-brand">
+                      <div className="max-w-[80%] rounded-[18px] border border-brand/15 bg-brandsoft px-5 py-3 text-[15px] leading-[1.7] text-brand">
                         {m.text}
                       </div>
                     </div>
@@ -703,7 +702,7 @@ export default function App() {
                                 REPORT
                               </span>
                             </div>
-                            <div className="report-md px-5 py-4">
+                            <div className="report-md px-5 py-5">
                               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                 {m.answer}
                               </ReactMarkdown>
@@ -725,7 +724,7 @@ export default function App() {
           <div className="mx-auto w-full max-w-3xl border-x border-[color:var(--hairline)] bg-surface px-4 pt-2 pb-6 sm:px-6">
             <div className="cmdbar flex items-center gap-2 rounded-2xl border border-bar bg-surface p-2 pl-4">
               <input
-                className="min-w-0 flex-1 border-0 bg-transparent font-mono text-sm text-ink outline-none placeholder:text-ink2/70 disabled:cursor-not-allowed disabled:opacity-50"
+                className="min-w-0 flex-1 border-0 bg-transparent font-mono text-[15px] text-ink outline-none placeholder:text-ink2/70 disabled:cursor-not-allowed disabled:opacity-50"
                 value={input}
                 placeholder={busy ? "Agent 运行中…" : "向 Agent 下达数据指令…"}
                 onChange={(e) => setInput(e.target.value)}

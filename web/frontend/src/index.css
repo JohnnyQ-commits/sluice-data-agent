@@ -174,8 +174,8 @@
 /* ---------- 报告卡 markdown 正文：贴合设计系统的手写作用域样式 ---------- */
 
 .report-md {
-  font-size: 0.875rem;
-  line-height: 1.625;
+  font-size: 0.9375rem; /* 15px：与消息正文同级 */
+  line-height: 1.7;
   color: var(--ink);
   overflow-wrap: break-word;
 }
@@ -193,25 +193,25 @@
   font-weight: 600;
   line-height: 1.4;
   color: var(--ink);
-  margin: 1.25em 0 0.5em;
+  margin: 1.4em 0 0.55em;
 }
 .report-md h1 {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
 }
 .report-md h2 {
-  font-size: 1.125rem;
+  font-size: 1.15rem;
 }
 .report-md h3 {
   font-size: 1rem;
 }
 .report-md h4 {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 .report-md p {
   margin: 0.75em 0;
 }
 .report-md strong {
-  font-weight: 600;
+  font-weight: 700; /* 中文粗体 600 不明显，DeepSeek 式一眼可辨 */
   color: var(--ink);
 }
 .report-md ul,
@@ -281,6 +281,10 @@
   font-weight: 600;
   background: color-mix(in srgb, var(--ink) 3%, var(--paper)); /* paper 加深一档 */
   white-space: nowrap;
+}
+.report-md th,
+.report-md td {
+  font-size: 0.8125rem; /* 表格是数据：13px 与正文拉开层级 */
 }
 .report-md a {
   color: var(--brand);
