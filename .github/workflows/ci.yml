@@ -15,6 +15,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
+      - run: python scripts/seed_demo_db.py
       - run: ruff check src/ tests/ scripts/
       - run: pytest tests/ -q
 
