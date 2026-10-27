@@ -239,7 +239,7 @@ function EventLine({ ev }) {
               GATE {ev.gate} · ROUND {String(ev.round).padStart(2, "0")}
             </span>
           </div>
-          <p className="mt-2 text-[15px] leading-[1.7]">{ev.reason}</p>
+          <p className="mt-2 text-[14px] leading-[1.65]">{ev.reason}</p>
         </div>
       </TimelineRow>
     );
@@ -757,8 +757,8 @@ export default function App() {
                       "radial-gradient(480px 260px at 50% 22%, color-mix(in srgb, var(--brand) 4%, transparent), transparent 70%)",
                   }}
                 />
-                <h2 className="text-3xl font-semibold text-ink">你好，我是 Sluice</h2>
-                <p className="mt-3 text-[15px] text-ink2">下达数据指令，每一步都可见、可信</p>
+                <h2 className="text-2xl font-semibold text-ink">你好，我是 Sluice</h2>
+                <p className="mt-3 text-[14px] text-ink2">下达数据指令，每一步都可见、可信</p>
                 <div className="mt-8 grid w-full max-w-2xl gap-3 sm:grid-cols-3">
                   {FEATURES.map((f) => (
                     <div
@@ -789,7 +789,7 @@ export default function App() {
                 {messages.map((m, i) =>
                   m.role === "user" ? (
                     <div key={i} className="anim-entry flex justify-end">
-                      <div className="max-w-[80%] rounded-[18px] border border-brand/15 bg-brandsoft px-5 py-3 text-[15px] leading-[1.7] text-brand">
+                      <div className="max-w-[80%] rounded-[18px] border border-brand/15 bg-brandsoft px-5 py-3 text-[14px] leading-[1.65] text-brand">
                         {m.text}
                       </div>
                     </div>
@@ -833,7 +833,7 @@ export default function App() {
             <div className="cmdbar rounded-2xl border border-bar bg-surface p-2 pl-4">
               <div className="flex items-center gap-2">
                 <input
-                  className="min-w-0 flex-1 border-0 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink2/70 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-w-0 flex-1 border-0 bg-transparent text-[14px] text-ink outline-none placeholder:text-ink2/70 disabled:cursor-not-allowed disabled:opacity-50"
                   value={input}
                   placeholder={busy ? "Agent 运行中…" : "向 Agent 下达数据指令…"}
                   onChange={(e) => setInput(e.target.value)}

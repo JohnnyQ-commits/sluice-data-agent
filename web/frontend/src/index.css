@@ -171,8 +171,8 @@
 /* ---------- 报告卡 markdown 正文：贴合设计系统的手写作用域样式 ---------- */
 
 .report-md {
-  font-size: 0.9375rem; /* 15px：与消息正文同级 */
-  line-height: 1.7;
+  font-size: 0.875rem; /* 14px：报告正文 */
+  line-height: 1.65;
   color: var(--ink);
   overflow-wrap: break-word;
 }
@@ -193,16 +193,16 @@
   margin: 1.4em 0 0.55em;
 }
 .report-md h1 {
-  font-size: 1.35rem;
+  font-size: 1.2rem;
 }
 .report-md h2 {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
 }
 .report-md h3 {
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 .report-md h4 {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
 }
 .report-md p {
   margin: 0.75em 0;
