@@ -37,10 +37,19 @@ def _load_true_numbers() -> dict | None:
 
 _TRUE = _load_true_numbers() or {"total": 300.0, "new_users": 5}
 
+# 报告显式标注统计窗口（与 demo 库相对播种同源推算）——周界锚定是 user-activity
+# 评测的职责，这里剔除该歧义，让负向用例单测「敢不敢说不符」（run6 实录：模型
+# 自选错一周窗口，把真值新增用户误判成不符）。
+from datetime import date, timedelta
+
+_last_sunday = date.today() - timedelta(days=date.today().weekday() + 1)
+_last_monday = _last_sunday - timedelta(days=6)
+_WINDOW = f"{_last_monday.isoformat()} ~ {_last_sunday.isoformat()}"
+
 
 def _report(total_text: str) -> str:
     return (
-        "【上周经营周报】\n"
+        f"【上周经营周报】（统计窗口 {_WINDOW}，周一至周日）\n"
         f"上周销售总额 {total_text} 元，环比上升。\n"
         f"上周新增用户 {_TRUE['new_users']} 人，活跃平稳。\n"
         "整体经营向好。"
