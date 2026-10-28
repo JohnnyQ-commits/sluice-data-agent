@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from sluice.tools.base import Tool, ToolResult
@@ -158,14 +159,14 @@ class RenderVerdictTool(Tool):
     def _stamp(claimed: str, db_value: Any) -> tuple[str, str]:
         """确定性判定单条结论。返回 (verdict, 真值展示文本)。
 
-        真值剥除千分位逗号再解析——模型从查询结果转抄数值时常带千分位
-        （213,177.33），float() 原样解析会失败并被误判「存疑」（实录教训）。
+        真值从转抄文本中正则抽取首个数值——模型从查询结果转抄时常带千分位或单位
+        （213,177.33 / 47 人），整串 float() 解析会失败并被误判「存疑」（实录教训）。
+        抽不到任何数值（真值缺失、纯文本）才判存疑。
         """
-        text = str(db_value).replace(",", "").replace("，", "").strip()
-        try:
-            value = float(text)
-        except (TypeError, ValueError):
+        match = re.search(r"[-+]?\d[\d,]*(?:\.\d+)?", str(db_value))
+        if match is None:
             return _VERDICT_UNCERTAIN, str(db_value) if db_value not in (None, "") else ""
+        value = float(match.group().replace(",", "").replace("，", ""))
         verdict = _VERDICT_OK if check_value_in_answer(value, claimed) else _VERDICT_BAD
         return verdict, str(db_value)
 

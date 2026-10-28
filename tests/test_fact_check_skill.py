@@ -141,6 +141,22 @@ def test_render_verdict_db_value_with_thousands_separator():
     assert "✅ 属实 1 项 | ❌ 不符 1 项 | ⚠️ 存疑 0 项" in result.content
 
 
+def test_render_verdict_db_value_with_unit_text():
+    """真值转抄带单位（"47 人"）正则抽取数值，不再误判存疑——实录教训 run4。"""
+    result = _verdict_tool().execute(
+        {
+            "title": "验真",
+            "summary": "ok",
+            "items": [
+                {"claim": "新增用户", "claimed": "上周新增用户 47 人", "db_value": "47 人"},
+                {"claim": "销售额", "claimed": "21.3万", "db_value": "213,177.33 元"},
+                {"claim": "无数据", "claimed": "上周数据", "db_value": "查询结果为空", "note": "窗口无数据"},
+            ],
+        }
+    )
+    assert "✅ 属实 2 项 | ❌ 不符 0 项 | ⚠️ 存疑 1 项" in result.content
+
+
 def test_render_verdict_int_value_accepts_decimal_claim():
     """真值整值 311，声称写 311.0（反向宽容）也判属实。"""
     result = _verdict_tool().execute(

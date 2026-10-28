@@ -18,6 +18,7 @@ output_contract: 核心指标;趋势分析;重点发现
 ## 统计口径
 
 - **DAU**：当日去重 login 用户数（`COUNT(DISTINCT user_id) WHERE event_type='login'`）；周报报"日均 DAU"（上周 7 天 DAU 平均）——日均 DAU 在 SQL 中 `ROUND(AVG,1)` 计算并直接引用返回值，保留 1 位小数（如 203.0，禁止心算取整写成 203）
+- **日均 DAU ≠ 周去重用户数（高频混淆，实录教训）**：日均 DAU = 先按天分组算每日去重 login 数，再对 7 天求平均（`SELECT ROUND(AVG(c),1) FROM (SELECT COUNT(DISTINCT user_id) AS c FROM user_events WHERE ... GROUP BY event_date)`）；`COUNT(DISTINCT user_id)` 不按天分组得的是周去重总数（如 344），**禁止用它冒充日均 DAU**
 - **新增用户**：当日首次出现的用户数（当天是其 `MIN(event_date)`）；周报报"周新增"（上周 7 天新增求和）
 - **自然周**：Monday–Sunday，禁止用 MAX(event_date) 当"今天"锚点
 - **周期锚点（正向规则）**：以上周 = 当前系统日期所在自然周的前一个完整自然周（周一~周日）推算周界。demo 库日期随播种窗口滚动（数据末端≈昨天），不要凭对话猜测具体日期——周界由系统日期推算，数据覆盖在探查步核实
