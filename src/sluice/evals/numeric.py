@@ -7,37 +7,14 @@ judge 只评口径/表述等质性维度，数值正确性走确定性比对。
 匹配是"真值数字必须出现在产出中"的宽容方向：整数/1 位小数/2 位小数多种格式候选
 任一命中即可（真值 174.0 接受产出写 174 或 174.0），词边界断开防止子串误命中
 （真值 311 不匹配 1311）。千分位逗号在产出侧剥除后再比对。
+（格式候选与词边界匹配实现在 utils/numeric_match.py，与 fact-check Skill 共用。）
 """
 
 from __future__ import annotations
 
-import re
 import sqlite3
 
-# 词边界不用 \b：小数点两侧的数字段（"16.5" 之于 "16.52"）\b 拦不住，显式前后向断言更严
-_L = r"(?<![\d.])"
-_R = r"(?![\d.])"
-
-
-def _candidates(value: float) -> list[str]:
-    """真值 → 可接受的产出格式候选，去重保序。
-
-    基础形态：2 位小数/1 位小数/整值；中文报告习惯"万"缩写（213177.33 → 21.32万），
-    万级真值追加 1~2 位小数的万缩写候选。
-    """
-    out = [f"{value:.2f}", f"{value:.1f}"]
-    if value == int(value):
-        out.append(str(int(value)))
-    if abs(value) >= 10000:
-        wan = value / 10000
-        out += [f"{wan:.2f}万", f"{wan:.1f}万"]
-    return list(dict.fromkeys(out))
-
-
-def check_value_in_answer(value: float, answer: str) -> bool:
-    """真值数字（词边界限定）是否出现在产出中。"""
-    normalized = answer.replace(",", "")
-    return any(re.search(_L + re.escape(cand) + _R, normalized) for cand in _candidates(value))
+from ..utils.numeric_match import check_value_in_answer
 
 
 def verify_expect_values(db_path: str, expect_values: list[dict], answer: str) -> list[dict]:
