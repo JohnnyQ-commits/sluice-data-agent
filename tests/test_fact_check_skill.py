@@ -157,6 +157,22 @@ def test_render_verdict_db_value_with_unit_text():
     assert "✅ 属实 2 项 | ❌ 不符 0 项 | ⚠️ 存疑 1 项" in result.content
 
 
+def test_render_verdict_qualitative_claim_is_uncertain():
+    """声称文本无数值（定性描述被误塞进明细）判存疑而非不符——run7 实录假不符教训。"""
+    result = _verdict_tool().execute(
+        {
+            "title": "验真",
+            "summary": "ok",
+            "items": [
+                {"claim": "定性声称", "claimed": "环比上升", "db_value": "+17.0%"},
+                {"claim": "定性声称2", "claimed": "活跃平稳", "db_value": "344"},
+                {"claim": "真不符", "claimed": "销售额 999 元", "db_value": "300"},
+            ],
+        }
+    )
+    assert "✅ 属实 0 项 | ❌ 不符 1 项 | ⚠️ 存疑 2 项" in result.content
+
+
 def test_render_verdict_int_value_accepts_decimal_claim():
     """真值整值 311，声称写 311.0（反向宽容）也判属实。"""
     result = _verdict_tool().execute(

@@ -163,6 +163,10 @@ class RenderVerdictTool(Tool):
         （213,177.33 / 47 人），整串 float() 解析会失败并被误判「存疑」（实录教训）。
         抽不到任何数值（真值缺失、纯文本）才判存疑。
         """
+        # 声称文本没有数字就没法做数值对账（模型把定性声称"活跃平稳"也塞进明细的
+        # 实录教训）：判存疑而非不符——不符留给"数字对不上"，不用来惩罚选错条目。
+        if not re.search(r"\d", claimed):
+            return _VERDICT_UNCERTAIN, str(db_value) if db_value not in (None, "") else ""
         match = re.search(r"[-+]?\d[\d,]*(?:\.\d+)?", str(db_value))
         if match is None:
             return _VERDICT_UNCERTAIN, str(db_value) if db_value not in (None, "") else ""
