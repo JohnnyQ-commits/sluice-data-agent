@@ -156,9 +156,14 @@ class RenderVerdictTool(Tool):
 
     @staticmethod
     def _stamp(claimed: str, db_value: Any) -> tuple[str, str]:
-        """确定性判定单条结论。返回 (verdict, 真值展示文本)。"""
+        """确定性判定单条结论。返回 (verdict, 真值展示文本)。
+
+        真值剥除千分位逗号再解析——模型从查询结果转抄数值时常带千分位
+        （213,177.33），float() 原样解析会失败并被误判「存疑」（实录教训）。
+        """
+        text = str(db_value).replace(",", "").replace("，", "").strip()
         try:
-            value = float(str(db_value).strip())
+            value = float(text)
         except (TypeError, ValueError):
             return _VERDICT_UNCERTAIN, str(db_value) if db_value not in (None, "") else ""
         verdict = _VERDICT_OK if check_value_in_answer(value, claimed) else _VERDICT_BAD

@@ -124,6 +124,23 @@ def test_render_verdict_non_numeric_db_value_is_uncertain():
     assert "⚠️ 存疑 1 项" in result.content
 
 
+def test_render_verdict_db_value_with_thousands_separator():
+    """真值带千分位逗号（模型从查询结果转抄）不再误判存疑——实录教训：float 解析失败全批存疑。"""
+    result = _verdict_tool().execute(
+        {
+            "title": "验真",
+            "summary": "ok",
+            "items": [
+                # 真值 213177.33（传入 "213,177.33"），声称 21.3万 → 属实
+                {"claim": "销售额", "claimed": "21.3万", "db_value": "213,177.33"},
+                # 真值同上，声称 277,130（篡改值）→ 不符
+                {"claim": "销售额-篡改", "claimed": "277,130", "db_value": "213,177.33"},
+            ],
+        }
+    )
+    assert "✅ 属实 1 项 | ❌ 不符 1 项 | ⚠️ 存疑 0 项" in result.content
+
+
 def test_render_verdict_int_value_accepts_decimal_claim():
     """真值整值 311，声称写 311.0（反向宽容）也判属实。"""
     result = _verdict_tool().execute(
