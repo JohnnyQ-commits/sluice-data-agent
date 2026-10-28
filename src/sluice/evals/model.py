@@ -19,6 +19,7 @@ _ALLOWED_KEYS = {
     "input",
     "must_contain",
     "judge_rubric",
+    "expect_values",
     "expect_skill",
     "script",
     "expect_guardrails",
@@ -34,6 +35,9 @@ class EvalCase:
     input: str
     must_contain: list[str] = field(default_factory=list)
     judge_rubric: list[str] = field(default_factory=list)
+    # 确定性数值通道（备案①）：[{"label", "sql"}]——runner 查库取真值与产出对账，
+    # 数值正确性不依赖 judge；judge_rubric 只留口径/表述等质性维度
+    expect_values: list[dict] = field(default_factory=list)
     expect_skill: str = ""
     script: list[dict] = field(default_factory=list)
     expect_guardrails: list[dict] = field(default_factory=list)
@@ -53,6 +57,16 @@ class EvalCase:
         for key in ("must_contain", "judge_rubric", "script", "expect_guardrails"):
             if key in raw and not isinstance(raw[key], list):
                 raise ValueError(f"字段 {key} 应为 list，收到 {type(raw[key]).__name__}: {raw!r}")
+        expect_values = list(raw.get("expect_values", []))
+        for item in expect_values:
+            if (
+                not isinstance(item, dict)
+                or not isinstance(item.get("label"), str)
+                or not item["label"]
+                or not isinstance(item.get("sql"), str)
+                or not item["sql"]
+            ):
+                raise ValueError(f"expect_values 项应含非空 label/sql 字符串，收到: {item!r}")
         return cls(
             skill=skill,
             name=raw["name"],
@@ -60,6 +74,7 @@ class EvalCase:
             input=raw["input"],
             must_contain=list(raw.get("must_contain", [])),
             judge_rubric=list(raw.get("judge_rubric", [])),
+            expect_values=expect_values,
             expect_skill=raw.get("expect_skill", ""),
             script=list(raw.get("script", [])),
             expect_guardrails=list(raw.get("expect_guardrails", [])),

@@ -6,10 +6,26 @@ CASES = [
         "layer": "outcome",
         "input": "生成上周的用户活跃周报",
         "must_contain": ["核心指标", "趋势分析", "重点发现"],
+        # 数值正确性走确定性通道（备案①）：SQL 真值查库对账，judge 骗不过查库。
+        # 周界用系统日期锚定（weekday 0 = 本周日，-7/-13 = 上周日/上周一），
+        # 与 demo 库相对播种窗口（备案②）配套，用例无保质期。
+        "expect_values": [
+            {
+                "label": "上周周活跃用户数(WAU)",
+                "sql": "SELECT COUNT(DISTINCT user_id) FROM user_events "
+                "WHERE event_type='login' AND event_date BETWEEN "
+                "date('now','localtime','weekday 0','-13 days') AND date('now','localtime','weekday 0','-7 days')",
+            },
+            {
+                "label": "上周新增用户数",
+                "sql": "SELECT COUNT(*) FROM (SELECT user_id FROM user_events "
+                "GROUP BY user_id HAVING MIN(event_date) BETWEEN "
+                "date('now','localtime','weekday 0','-13 days') AND date('now','localtime','weekday 0','-7 days'))",
+            },
+        ],
         "judge_rubric": [
-            "数值必须与 demo 库 user_events 表真实聚合一致（日均 DAU/周新增用户数/周环比），不得编造",
             "DAU 口径为当日去重 login 用户数，新增口径为当日首次出现用户数；环比与日均 DAU 保留 1 位小数",
-            "统计周期为自然周（周一~周日），禁止用 MAX(event_date) 锚点；覆盖不足时注明",
+            "统计周期为自然周（周一~周日）；覆盖不足时注明",
         ],
     },
     {

@@ -9,8 +9,17 @@ CASES = [
         "layer": "outcome",
         "input": "生成上周的数据周报",
         "must_contain": ["核心指标", "重点发现"],
+        # 数值正确性走确定性通道（备案①）：上周销售总额 SQL 真值查库对账。
+        # 周界系统日期锚定（与备案②相对播种配套），千分位/小数位格式差异由
+        # numeric.py 的多格式候选吸收。
+        "expect_values": [
+            {
+                "label": "上周销售总额",
+                "sql": "SELECT SUM(amount) FROM sales WHERE sale_date BETWEEN "
+                "date('now','localtime','weekday 0','-13 days') AND date('now','localtime','weekday 0','-7 days')",
+            },
+        ],
         "judge_rubric": [
-            "数值必须与 demo 库 sales 表真实聚合一致，不得编造",
             "环比计算正确：(本周值-上周值)/上周值，符号与百分比无误",
             "统计周期为自然周（周一~周日）；数据覆盖不足整周时注明实际覆盖范围",
         ],

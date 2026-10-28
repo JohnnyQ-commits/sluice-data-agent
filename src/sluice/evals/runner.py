@@ -172,9 +172,10 @@ class BehaviorRunner:
 
 
 class OutcomeRunner:
-    """① 产出评测：完整 ReAct 循环 + 确定性断言（must_contain）。
+    """① 产出评测：完整 ReAct 循环 + 确定性断言（must_contain + expect_values 数值对账）。
 
-    语义断言（judge_rubric + LLM-as-judge）由 T7 接入本类。
+    语义断言（judge_rubric + LLM-as-judge）只承担质性维度；数值正确性走 expect_values
+    的 SQL 真值对账（evals/numeric.py）——judge 无查库通道，数值交给它会被编造骗过。
     """
 
     def __init__(
@@ -226,6 +227,20 @@ class OutcomeRunner:
             )
         missing = [s for s in case.must_contain if s not in answer]
         detail: dict = {"missing": missing, "answer_head": answer[:200]}
+        if case.expect_values:
+            # 确定性数值通道（备案①）：SQL 真值对账，不依赖 judge
+            from .numeric import verify_expect_values
+
+            value_results = verify_expect_values(
+                self._settings.demo_db_path, case.expect_values, answer
+            )
+            detail["expect_values"] = value_results
+            missing = missing + [
+                f"数值 [{r['label']}] 未在产出核对到真值 {r.get('expected')}（{r.get('error', '产出未含')}）"
+                for r in value_results
+                if not r["found"]
+            ]
+            detail["missing"] = missing  # detail 旧键持列表引用，重赋后须同步回填
         if case.judge_rubric and self._judge_client is not None:
             from .judge import judge_output  # T7 落地后生效；此前 judge_rubric 用例不带 judge 跑
 
