@@ -20,7 +20,14 @@ def test_run_executes_weekly_report_tool(monkeypatch, capsys, tmp_path):
 
     LLMClient 打桩为剧本回放：第 1 轮调 weekly-report.query_sales（对内置 demo 库
     跑真实 SQL），第 2 轮收尾——证明 _run 的 registry 真挂上了 Skill 工具而非只有 echo。
+    查询窗口取"上周"（相对系统日期）而非硬编码日期：demo.db 是相对日期播种（备案②），
+    固定窗口在新播种的库里会是空集，测试就从"真实聚合"退化成"空结果也过"。
     """
+    from datetime import date, timedelta
+
+    today = date.today()
+    last_sunday = today - timedelta(days=today.weekday() + 1)
+    last_monday = last_sunday - timedelta(days=6)
     repo_root = cli_main._REPO_ROOT
     monkeypatch.setenv("SLUICE_LLM_API_KEY", "test-key")
     monkeypatch.setenv("SLUICE_DEMO_DB_PATH", str(repo_root / "data" / "demo.db"))
@@ -33,7 +40,7 @@ def test_run_executes_weekly_report_tool(monkeypatch, capsys, tmp_path):
                     "tool": "weekly-report.query_sales",
                     "args": {
                         "sql": "SELECT city, SUM(amount) AS amt FROM sales "
-                        "WHERE sale_date BETWEEN '2026-10-12' AND '2026-10-18' GROUP BY city"
+                        f"WHERE sale_date BETWEEN '{last_monday}' AND '{last_sunday}' GROUP BY city"
                     },
                 }
             ),

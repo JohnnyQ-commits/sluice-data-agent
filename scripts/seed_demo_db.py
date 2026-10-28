@@ -27,10 +27,12 @@ conn.execute(
 )
 rows = []
 random.seed(42)
-# 21 天 × 每天每城市每品类若干笔，量的分布让"近一周 vs 上一周"有可见差异
-for day in range(1, 22):
-    date = f"2026-10-{day:02d}"
-    bump = 1.6 if day >= 15 else 1.0  # 第 3 周整体上量，周报能看出环比
+# 21 天窗口锚定系统日期（末日=昨天）："上周"（自然周）恒有完整数据，demo 无保质期（备案②）。
+# 量的分布让"近一周 vs 上一周"有可见差异：最近 7 天整体上量，周报能看出环比。
+END = _date.today() - timedelta(days=1)
+for offset in range(21):
+    date = (END - timedelta(days=20 - offset)).isoformat()
+    bump = 1.6 if offset >= 14 else 1.0  # 最近 7 天上量
     for city in CITIES:
         for cat in CATEGORIES:
             for _ in range(random.randint(1, 4)):
@@ -48,7 +50,8 @@ conn.execute(
 )
 random.seed(44)
 # 近 30 天用户事件：几百用户，日活整体上行 + 周末回落，新增用户每日零星进入
-START = _date(2026, 9, 24)
+# 同样锚定系统日期（末日=昨天），与 sales 同一播种窗口语义
+START = _date.today() - timedelta(days=30)
 DAYS = 30
 event_rows = []
 user_first: dict[str, str] = {}
