@@ -3,7 +3,7 @@
 import sqlite3
 
 import pytest
-from tests.test_evals_runner import _package, _registry
+from test_evals_runner import _package, _registry  # 同目录顶层导入：tests/ 无 __init__.py，CI 上 'tests' 不是包
 
 from sluice.config.settings import Settings
 from sluice.evals.model import EvalCase
