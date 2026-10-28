@@ -1,0 +1,3 @@
+# 报告验真 Skill 配置（demo 数据源固定为平台 demo_db_path）
+datasource: platform-demo
+params: {}
