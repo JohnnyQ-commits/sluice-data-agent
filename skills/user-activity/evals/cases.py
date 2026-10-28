@@ -11,10 +11,11 @@ CASES = [
         # 与 demo 库相对播种窗口（备案②）配套，用例无保质期。
         "expect_values": [
             {
-                "label": "上周周活跃用户数(WAU)",
-                "sql": "SELECT COUNT(DISTINCT user_id) FROM user_events "
-                "WHERE event_type='login' AND event_date BETWEEN "
-                "date('now','localtime','weekday 0','-13 days') AND date('now','localtime','weekday 0','-7 days')",
+                "label": "上周日均 DAU",
+                "sql": "SELECT ROUND(AVG(c),1) FROM (SELECT COUNT(DISTINCT user_id) AS c "
+                "FROM user_events WHERE event_type='login' AND event_date BETWEEN "
+                "date('now','localtime','weekday 0','-13 days') AND date('now','localtime','weekday 0','-7 days') "
+                "GROUP BY event_date)",
             },
             {
                 "label": "上周新增用户数",

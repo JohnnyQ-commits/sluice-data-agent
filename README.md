@@ -7,7 +7,7 @@
 [![CI](https://github.com/JohnnyQ-commits/sluice-data-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/JohnnyQ-commits/sluice-data-agent/actions/workflows/ci.yml)
 [![Python](https://shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-322%20passed-brightgreen)](#快速体验)
+[![Tests](https://img.shields.io/badge/tests-352%20passed-brightgreen)](#快速体验)
 
 **[快速体验 ↓](#快速体验)** &nbsp;·&nbsp; **[架构](#架构)** &nbsp;·&nbsp; **[Skill 包协议](#skill-包协议)** &nbsp;·&nbsp; **[与同类项目的差异](#与同类项目的差异)**
 
