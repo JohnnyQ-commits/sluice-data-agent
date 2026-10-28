@@ -96,8 +96,13 @@ class QuerySalesTool(Tool):
         return self._kernel
 
     def table_allowlist(self) -> list[str]:
-        """转发内核的表名白名单——幻觉表门禁对前缀工具同样生效，不能哑火。"""
-        return self._kernel_tool().table_allowlist()
+        """静态声明本 Skill 的域内表——不转发内核 sqlite_master 全量名单。
+
+        备案④修复：转发全量名单时 weekly-report 可读 user_events（user-activity 的域内表），
+        表级隔离只对单侧成立；收窄为静态声明后跨域双向被拦，教学点两侧行为对称。
+        幻觉表门禁对前缀工具同样生效（名单非空即可查）。
+        """
+        return ["sales"]
 
     def execute(self, args: dict[str, Any]) -> ToolResult:
         sql = args.get("sql")

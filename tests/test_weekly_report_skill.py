@@ -39,19 +39,39 @@ def test_query_sales_delegates_and_rejects_non_string(tmp_path):
     assert bad.is_error and "sql" in bad.content.lower()
 
 
-def test_query_sales_forwards_table_allowlist(tmp_path):
-    """幻觉表门禁依赖 table_allowlist：前缀工具必须转发内核白名单，否则门禁哑火。"""
+def test_query_sales_table_allowlist_static(tmp_path):
+    """幻觉表门禁依赖 table_allowlist：前缀工具静态声明域内表，不随库内容漂移。
+
+    备案④：早前转发内核 sqlite_master 全量名单，库里有 user_events 就能跨域读——
+    表级隔离只对单侧（user-activity 侧）成立。收窄为静态 ["sales"] 后双向对称。
+    """
     import sqlite3
 
     db = tmp_path / "allow.db"
     conn = sqlite3.connect(db)
     conn.execute("CREATE TABLE sales (sale_date TEXT, city TEXT, category TEXT, amount REAL)")
+    conn.execute("CREATE TABLE user_events (user_id TEXT, event_date TEXT, event_type TEXT)")
     conn.commit()
     conn.close()
 
     tool_cls = type(_load().get("weekly-report.query_sales"))
     tool = tool_cls(str(db))
+    # 库里明明有 user_events，allowlist 仍只声明本域 sales——收窄与库内容无关
     assert tool.table_allowlist() == ["sales"]
+
+
+def test_query_sales_cross_domain_blocked_by_gate(tmp_path):
+    """表级隔离双向对称：weekly-report 引用 user_events 与 user-activity 引用 sales 同样被拦。"""
+    from sluice.guardrails.input_gate import InputGate
+    from sluice.llm.types import ToolUseBlock
+
+    tool = _load().get("weekly-report.query_sales")
+    gate = InputGate()
+    verdict = gate.check(
+        ToolUseBlock("t1", "weekly-report.query_sales", {"sql": "SELECT * FROM user_events"}),
+        tool,
+    )
+    assert verdict is not None and "幻觉表" in verdict[0]
 
 
 def test_render_report_produces_markdown():
