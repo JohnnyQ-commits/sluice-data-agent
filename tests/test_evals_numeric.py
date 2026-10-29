@@ -37,6 +37,10 @@ from test_evals_runner import _package, _registry
         (213177.33, "总销售额 213,177.33", True),  # 全值+千分位
         (213177.33, "总销售额 22.5万", False),
         (-3.5, "环比 -3.5%", True),  # 负值
+        (194.57, "日均 DAU 195", True),  # 最近整数候选：取整是渲染差异不是编造
+        (194.57, "日均 DAU 194.6", True),  # 1 位小数渲染
+        (194.57, "日均 DAU 196", False),  # 差 1.43 超出取整，仍是编造
+        (213177.33, "总销售额 213,177", True),  # 万级真值整值渲染
     ],
 )
 def test_check_value_in_answer(value, answer, expected):

@@ -23,10 +23,14 @@ def _candidates(value: float) -> list[str]:
 
     基础形态：2 位小数/1 位小数/整值；中文报告习惯"万"缩写（213177.33 → 21.32万），
     万级真值追加 1~2 位小数的万缩写候选。
+    非整值追加最近整数候选（194.57 → "195"）：取整是渲染差异不是编造——编造差异
+    是数量级的（1311 vs 311），词边界+候选集足以区分。
     """
     out = [f"{value:.2f}", f"{value:.1f}"]
     if value == int(value):
         out.append(str(int(value)))
+    else:
+        out.append(str(round(value)))
     if abs(value) >= 10000:
         wan = value / 10000
         out += [f"{wan:.2f}万", f"{wan:.1f}万"]
