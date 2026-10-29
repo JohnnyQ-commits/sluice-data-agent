@@ -157,7 +157,7 @@ function EventLine({ ev }) {
                 {(ev.tools || []).map((t) => (
                   <div key={t.name} className="min-w-0 text-xs leading-snug">
                     <span className="font-medium text-ink">{t.name}</span>
-                    <span className="ml-1.5 text-ink2">{t.description}</span>
+                    <span className="ml-1.5 text-[11px] text-ink2">{t.description}</span>
                   </div>
                 ))}
               </div>
