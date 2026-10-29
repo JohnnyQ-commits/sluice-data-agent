@@ -306,6 +306,18 @@
     var(--elev-soft);
 }
 
+/* ---------- 空态氛围：工程纸点阵肌理（径向淡出，边缘不留硬边） ---------- */
+
+.dots-bg {
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--ink) 5%, transparent) 1px,
+    transparent 1.5px
+  );
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(420px 300px at 50% 40%, #000, transparent 75%);
+  mask-image: radial-gradient(420px 300px at 50% 40%, #000, transparent 75%);
+}
+
 /* ---------- 动效 ---------- */
 
 @keyframes sluice-rise {

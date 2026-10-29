@@ -17,10 +17,30 @@ from pathlib import Path
 
 _ID_RE = re.compile(r"[0-9a-f]{32}\Z")  # uuid4().hex——同时挡路径穿越
 _TITLE_LEN = 24
+_SNIPPET_WIN = 30  # 命中词前后各取的字符数（侧栏单行摘要）
 
 
 def _now() -> str:
     return datetime.now().isoformat()  # 微秒精度：同秒内多会话排序不并列
+
+
+def _match_span(text, query: str):
+    """换行折叠成单行后忽略大小写检索，命中返回（展平文本, (起, 止)），未命中 None。
+
+    在展平文本上检索保证摘要窗口切出来就是单行可直接展示的片段。
+    """
+    flat = " ".join(str(text).split())
+    m = re.search(re.escape(query), flat, re.IGNORECASE)
+    if m is None:
+        return None
+    return flat, m.span()
+
+
+def _excerpt(flat: str, span) -> str:
+    start, end = span
+    left = max(0, start - _SNIPPET_WIN)
+    right = min(len(flat), end + _SNIPPET_WIN)
+    return ("…" if left else "") + flat[left:right] + ("…" if right < len(flat) else "")
 
 
 class ConversationStore:
@@ -91,6 +111,47 @@ class ConversationStore:
                         "id": conv["id"],
                         "title": conv.get("title") or "(未命名对话)",
                         "updated_at": conv.get("updated_at") or "",
+                    }
+                )
+        items.sort(key=lambda c: c["updated_at"], reverse=True)
+        return items
+
+    def search(self, query: str) -> list[dict]:
+        """标题 + 消息正文（用户问/最终答）子串检索，命中项附单行摘要。
+
+        list() 的超集形状（多一个 snippet 字段），按 updated_at 倒序与 list 一致。
+        """
+        q = (query or "").strip()
+        if not q:
+            return []
+        with self._lock:
+            files = list(self._base.glob("*.json")) if self._base.is_dir() else []
+        items = []
+        for path in files:
+            conv = self._read(path)
+            if not (conv and conv.get("id")):
+                continue
+            title = conv.get("title") or "(未命名对话)"
+            snippet = None
+            hit = _match_span(title, q)
+            if hit is not None:
+                snippet = _excerpt(*hit)
+            else:
+                for msg in conv.get("messages") or []:
+                    for field in ("user", "answer"):
+                        hit = _match_span(msg.get(field) or "", q)
+                        if hit is not None:
+                            snippet = _excerpt(*hit)
+                            break
+                    if snippet is not None:
+                        break
+            if snippet is not None:
+                items.append(
+                    {
+                        "id": conv["id"],
+                        "title": title,
+                        "updated_at": conv.get("updated_at") or "",
+                        "snippet": snippet,
                     }
                 )
         items.sort(key=lambda c: c["updated_at"], reverse=True)

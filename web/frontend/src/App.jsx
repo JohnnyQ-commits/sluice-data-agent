@@ -72,6 +72,13 @@ const ICONS = {
     </>
   ),
   file: <path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h3" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </>
+  ),
+  close: <path d="M6 6l12 12M18 6 6 18" />,
 };
 
 /* 空状态三特性卡：价值主张引导 */
@@ -292,7 +299,10 @@ export default function App() {
   const [confirmUnskill, setConfirmUnskill] = useState(null); // 二击确认卸载的 skill 名
   const [selSkill, setSelSkill] = useState(null); // 本次发送强制使用的 skill；null = 自动匹配
   const [skillMenuOpen, setSkillMenuOpen] = useState(false); // 命令栏 skill 选择菜单
+  const [searchQ, setSearchQ] = useState(""); // 侧栏会话搜索（后端 ?q= 过滤）
   const bottomRef = useRef(null);
+  const searchRef = useRef(""); // loadConvos 经 ref 读当前词，send 收尾延迟刷新不闭包过期
+  searchRef.current = searchQ;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -308,9 +318,10 @@ export default function App() {
     } catch {}
   }, [theme]);
 
-  // 历史会话：首屏拉列表 + 恢复上次会话
+  // 历史会话：首屏拉列表 + 恢复上次会话（有搜索词时走 ?q= 过滤通道）
   function loadConvos() {
-    fetch("/api/conversations")
+    const q = searchRef.current.trim();
+    fetch(q ? `/api/conversations?q=${encodeURIComponent(q)}` : "/api/conversations")
       .then((r) => r.json())
       .then((d) => setConvos(d.conversations || []))
       .catch(() => {});
@@ -337,6 +348,18 @@ export default function App() {
     else if (last) openConversation(last);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅首挂载执行
   }, []);
+
+  // 搜索防抖：输入停顿 250ms 才发请求；清空立即回全量（首挂载由上方 effect 拉取，此处跳过）
+  const searchMountedRef = useRef(false);
+  useEffect(() => {
+    if (!searchMountedRef.current) {
+      searchMountedRef.current = true;
+      return;
+    }
+    const t = setTimeout(loadConvos, searchQ.trim() ? 250 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadConvos 经 ref 读最新词
+  }, [searchQ]);
 
   function rememberActive(id) {
     setActiveId(id);
@@ -528,10 +551,33 @@ export default function App() {
               <span className="truncate">新对话</span>
             </button>
           </div>
-          <p className="px-4 pt-2 pb-1.5 text-xs text-ink2">会话历史</p>
+          <div className="px-3 pt-1 pb-2">
+            <p className="px-1 pb-1.5 text-xs text-ink2">会话历史</p>
+            <div className="flex items-center gap-1.5 rounded-lg border border-bar bg-paper px-2 py-1.5 transition-colors focus-within:border-brand">
+              <Icon path={ICONS.search} className="h-3.5 w-3.5 shrink-0 text-ink2" />
+              <input
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                placeholder="搜索会话内容…"
+                className="min-w-0 flex-1 border-0 bg-transparent text-xs text-ink outline-none placeholder:text-ink2/60"
+              />
+              {searchQ && (
+                <button
+                  type="button"
+                  aria-label="清空搜索"
+                  onClick={() => setSearchQ("")}
+                  className="shrink-0 cursor-pointer text-ink2 transition-colors hover:text-ink"
+                >
+                  <Icon path={ICONS.close} className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
           <nav className="scroll-thin min-h-0 flex-1 overflow-y-auto px-2 pb-4">
             {convos.length === 0 ? (
-              <p className="px-2 pt-4 text-center text-xs text-ink2">暂无历史对话</p>
+              <p className="px-2 pt-4 text-center text-xs text-ink2">
+                {searchQ.trim() ? "无匹配会话" : "暂无历史对话"}
+              </p>
             ) : (
               convos.map((c) => (
                 <div
@@ -553,8 +599,11 @@ export default function App() {
                     >
                       {c.title}
                     </span>
-                    <span className="mt-0.5 block text-[11px] text-ink2">
-                      {relTime(c.updated_at)}
+                    <span
+                      className="mt-0.5 block truncate text-[11px] text-ink2"
+                      title={c.snippet || undefined}
+                    >
+                      {c.snippet || relTime(c.updated_at)}
                     </span>
                   </button>
                   <button
@@ -757,13 +806,24 @@ export default function App() {
                       "radial-gradient(480px 260px at 50% 22%, color-mix(in srgb, var(--brand) 4%, transparent), transparent 70%)",
                   }}
                 />
-                <h2 className="text-2xl font-semibold text-ink">你好，我是 Sluice</h2>
-                <p className="mt-3 text-[14px] text-ink2">下达数据指令，每一步都可见、可信</p>
+                {/* 工程纸点阵肌理：墨@5% 圆点铺底，径向淡出无硬边 */}
+                <div
+                  aria-hidden="true"
+                  className="dots-bg pointer-events-none absolute inset-0 -z-10"
+                />
+                <h2 className="anim-rise text-2xl font-semibold text-ink">你好，我是 Sluice</h2>
+                <p
+                  className="anim-rise mt-3 text-[14px] text-ink2"
+                  style={{ animationDelay: "60ms" }}
+                >
+                  下达数据指令，每一步都可见、可信
+                </p>
                 <div className="mt-8 grid w-full max-w-2xl gap-3 sm:grid-cols-3">
-                  {FEATURES.map((f) => (
+                  {FEATURES.map((f, i) => (
                     <div
                       key={f.title}
-                      className="rounded-xl border border-[color:var(--hairline)] bg-paper/60 px-4 py-3.5 text-left transition-all duration-150 hover:-translate-y-0.5 hover:bg-paper hover:shadow-panel"
+                      className="anim-rise rounded-xl border border-[color:var(--hairline)] bg-paper/60 px-4 py-3.5 text-left transition-all duration-150 hover:-translate-y-0.5 hover:bg-paper hover:shadow-panel"
+                      style={{ animationDelay: `${120 + i * 50}ms` }}
                     >
                       <Icon path={ICONS[f.icon]} className="h-[18px] w-[18px] text-brand" />
                       <p className="mt-2 text-sm font-medium text-ink">{f.title}</p>
@@ -771,7 +831,10 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-8 flex w-full max-w-md flex-col gap-2.5">
+                <div
+                  className="anim-rise mt-8 flex w-full max-w-md flex-col gap-2.5"
+                  style={{ animationDelay: "280ms" }}
+                >
                   {EXAMPLE_COMMANDS.map((t) => (
                     <button
                       key={t}

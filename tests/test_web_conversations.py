@@ -208,6 +208,68 @@ def test_chat_error_event_still_persists_turn(tmp_path):
     assert client.get("/api/conversations").get_json()["conversations"][0]["title"] == "触发报错"
 
 
+# ---------------- 会话搜索（标题 + 消息正文，?q= 端点过滤） ----------------
+
+
+def test_store_search_matches_title_user_and_answer(tmp_path):
+    store = ConversationStore(tmp_path)
+    t = store.create()
+    store.append_turn(t, "生成上周销售周报", [], "## 周报\n深圳环比下滑")
+    u = store.create()
+    store.append_turn(u, "查一下用户活跃", [], "答")
+    a = store.create()
+    store.append_turn(a, "随便看看", [], "结论：DAU 上行")
+    store.create()  # 无消息空会话，永不命中
+
+    by_title = {c["id"]: c for c in store.search("销售周报")}
+    assert set(by_title) == {t}
+    assert "深圳环比下滑" not in by_title[t]["snippet"]
+
+    by_user = {c["id"]: c for c in store.search("活跃")}
+    assert set(by_user) == {u}
+
+    by_answer = {c["id"]: c for c in store.search("DAU 上行")}
+    assert set(by_answer) == {a}
+    assert "DAU 上行" in by_answer[a]["snippet"]
+
+
+def test_store_search_case_insensitive_with_snippet_excerpt(tmp_path):
+    store = ConversationStore(tmp_path)
+    conv_id = store.create()
+    store.append_turn(conv_id, "解释一下", [], "前缀铺垫" + "x" * 40 + "KEY 域名在中间" + "y" * 40)
+    hits = store.search("key 域")
+    assert [c["id"] for c in hits] == [conv_id]
+    snippet = hits[0]["snippet"]
+    assert "KEY 域名在中间" in snippet  # 忽略大小写命中原文
+    assert len(snippet) < 90  # 截取窗口而非全文倾倒
+    assert snippet.startswith("…") and snippet.endswith("…")
+
+
+def test_store_search_no_match_and_empty_query(tmp_path):
+    store = ConversationStore(tmp_path)
+    conv_id = store.create()
+    store.append_turn(conv_id, "问", [], "答")
+    assert store.search("不存在的词") == []
+    assert store.search("") == []
+    assert store.search("   ") == []  # 纯空白等价空查询
+
+
+def test_search_endpoint_filters_by_query(conv_app):
+    client = conv_app.test_client()
+    hit = client.post("/api/conversations").get_json()["id"]
+    _ = client.post("/api/conversations").get_json()["id"]
+    resp = client.post(
+        "/api/chat", json={"message": "独特检索标记", "conversation_id": hit}
+    )
+    assert resp.status_code == 200
+    _finish(client, resp.get_json()["run_id"])
+    filtered = client.get("/api/conversations?q=独特检索标记").get_json()["conversations"]
+    assert [c["id"] for c in filtered] == [hit]
+    assert "独特检索标记" in filtered[0]["snippet"]
+    # 无 q 参数回落全量列表
+    assert len(client.get("/api/conversations").get_json()["conversations"]) == 2
+
+
 # ---------------- session_init 开场事件（可观测性） ----------------
 
 

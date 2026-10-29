@@ -274,6 +274,9 @@ def create_app(
 
     @app.get("/api/conversations")
     def list_conversations():
+        q = request.args.get("q", "").strip()
+        if q:
+            return jsonify({"conversations": conversations.search(q)})
         return jsonify({"conversations": conversations.list()})
 
     @app.post("/api/conversations")
