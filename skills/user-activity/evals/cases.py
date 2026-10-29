@@ -11,8 +11,10 @@ CASES = [
         # 与 demo 库相对播种窗口（备案②）配套，用例无保质期。
         "expect_values": [
             {
+                # 日均 DAU 不 ROUND：真值取未取整 AVG，匹配器多格式候选（194.57/194.6）
+                # 吸收模型任一精度写法——模型写 ROUND(,1) 或原值都命中（run 实教训）。
                 "label": "上周日均 DAU",
-                "sql": "SELECT ROUND(AVG(c),1) FROM (SELECT COUNT(DISTINCT user_id) AS c "
+                "sql": "SELECT AVG(c) FROM (SELECT COUNT(DISTINCT user_id) AS c "
                 "FROM user_events WHERE event_type='login' AND event_date BETWEEN "
                 "date('now','localtime','weekday 0','-13 days') AND date('now','localtime','weekday 0','-7 days') "
                 "GROUP BY event_date)",

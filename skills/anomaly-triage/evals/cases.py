@@ -20,14 +20,15 @@ CASES = [
                 "date('now','localtime','weekday 0','-13 days') AND date('now','localtime','weekday 0','-7 days')",
             },
             {
+                # 跌幅不 ROUND：匹配器的多格式候选（1/2 位小数）吸收模型任一精度写法
+                # （run 实教训：真值 ROUND(,1)=194.6 而模型写未取整 194.57，词边界不命中）。
+                # 子查询两窗口各取真值再相除——SUM 套 SUM 是语法错误（实录教训）。
                 "label": "异常城市销售额跌幅",
-                "sql": "SELECT ROUND((SUM(CASE WHEN sale_date BETWEEN "
-                "date('now','localtime','weekday 0','-20 days') AND date('now','localtime','weekday 0','-14 days') "
-                "THEN amount END - SUM(CASE WHEN sale_date BETWEEN "
-                "date('now','localtime','weekday 0','-13 days') AND date('now','localtime','weekday 0','-7 days') "
-                "THEN amount END)) * 100.0 / SUM(CASE WHEN sale_date BETWEEN "
-                "date('now','localtime','weekday 0','-20 days') AND date('now','localtime','weekday 0','-14 days') "
-                "THEN amount END), 1) FROM sales WHERE city='深圳'",
+                "sql": "SELECT (p.v - c.v) * 100.0 / p.v FROM "
+                "(SELECT SUM(amount) AS v FROM sales WHERE city='深圳' AND sale_date BETWEEN "
+                "date('now','localtime','weekday 0','-20 days') AND date('now','localtime','weekday 0','-14 days')) p, "
+                "(SELECT SUM(amount) AS v FROM sales WHERE city='深圳' AND sale_date BETWEEN "
+                "date('now','localtime','weekday 0','-13 days') AND date('now','localtime','weekday 0','-7 days')) c",
             },
         ],
         "judge_rubric": [
