@@ -7,7 +7,7 @@
 [![CI](https://github.com/JohnnyQ-commits/sluice-data-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/JohnnyQ-commits/sluice-data-agent/actions/workflows/ci.yml)
 [![Python](https://shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-366%20passed-brightgreen)](#快速体验)
+[![Tests](https://img.shields.io/badge/tests-380%20passed-brightgreen)](#快速体验)
 
 **[快速体验 ↓](#快速体验)** &nbsp;·&nbsp; **[架构](#架构)** &nbsp;·&nbsp; **[Skill 包协议](#skill-包协议)** &nbsp;·&nbsp; **[与同类项目的差异](#与同类项目的差异)**
 
@@ -72,7 +72,7 @@ pip install -e ".[dev]"
 ```bash
 python scripts/demo_guardrails.py    # 上面展示的三幕演示
 sluice eval --all --skip-judge       # 三层评测跑一遍
-pytest tests/ -q                     # 366 个测试全部零 key 可跑
+pytest tests/ -q                     # 380 个测试全部零 key 可跑
 ```
 
 **第二档：配置 LLM 解锁完整体验**（任意 Anthropic Messages 兼容端点）：
@@ -92,12 +92,13 @@ sluice eval --all                    # 完整评测含 judge 打分
 - **ReAct 循环 + 四拦截点** —— 工具调用前 / 循环运行中 / 产出交付前 / 恢复策略，门禁内建于发动机；`guardrails=None` 一键回到裸循环
 - **Skill 包协议** —— 三件套挂载即获得评测与门禁，业务无关运行时
 - **报告验真（fact-check）** —— 对任意数值报告逐条查库对账，属实/不符由确定性代码按词边界数值匹配盖章，结论骗不了；负向评测注入篡改报告，验真 Skill 必须敢说「不符」
+- **异常下钻（anomaly-triage）** —— "指标不对劲"时从整体到维度逐层下钻定位异常切片；demo 库播种了已知渠道异常（整体向好但深圳暴跌），评测用确定性通道对账根因真值——定位错了数字就对不上
 - **LLM-as-judge 防作弊** —— 评分必须逐字引用产出原文，引用比对不过判分无效：评测工具本身也不可被骗
 - **基线回归门禁** —— 通过率或 judge 均分对比基线下降即失败，消失的 Skill 显式报错
 - **零官方 LLM SDK** —— httpx 直连网关，function calling 手写实现，行为完全可读
 - **零官方 SDK 的 MCP client** —— protocol / transport / registry 三件套自实现（见[下文](#mcp-生态)）
 - **长期记忆** —— FAISS 本地向量检索，可选 Milvus 后端，默认关闭零行为变化
-- **零 API key 全量测试** —— 366 个测试，CI 持续验证
+- **零 API key 全量测试** —— 380 个测试，CI 持续验证
 
 ## 架构
 
@@ -142,7 +143,7 @@ flowchart TB
 |------|------|
 | `llm/` | httpx 直连 Anthropic Messages 兼容网关，超时重试与 function calling 自实现 |
 | `tools/` | 原子工具与注册表（SQLite 查询等），Skill 工具与 MCP 工具共用一个 registry |
-| `skills/` | Skill 包加载器 + 三个内置示例（`weekly-report`、`user-activity`、`fact-check`） |
+| `skills/` | Skill 包加载器 + 四个内置示例（`weekly-report`、`user-activity`、`fact-check`、`anomaly-triage`） |
 | `runtime/` | ReAct 循环发动机：多轮思考→行动→观察、轨迹记录、异常分类与自修恢复 |
 | `guardrails/` | 四拦截点编排：输入门禁（幻觉工具/非法参数/越权表）、行为门禁（重复调用/预算）、输出门禁（契约校验）、自修恢复 |
 | `evals/` | 三层执行器（门禁剧本 / 单轮行为 / 端到端产出）+ judge + 基线门禁 |
@@ -178,7 +179,7 @@ skills/weekly-report/
 
 平台对挂载的 Skill 兑现三件事：工具进 registry 参与 ReAct 循环；`SKILL.md` 的 `output_contract` 自动成为产出交付前的门禁校验项；`evals/cases.py` 被 `sluice eval` 纳入三层评测与基线门禁。
 
-参考实现：[`skills/weekly-report/`](skills/weekly-report/)、[`skills/user-activity/`](skills/user-activity/)、[`skills/fact-check/`](skills/fact-check/)——周报是单域最小示例，fact-check 演示「模型提取声称与真值、结论由确定性代码盖章」的可信分工（审计员角色，读权有意覆盖两域表）。
+参考实现：[`skills/weekly-report/`](skills/weekly-report/)、[`skills/user-activity/`](skills/user-activity/)、[`skills/fact-check/`](skills/fact-check/)、[`skills/anomaly-triage/`](skills/anomaly-triage/)——周报是单域最小示例，fact-check 演示「模型提取声称与真值、结论由确定性代码盖章」的可信分工（审计员角色，读权有意覆盖两域表），anomaly-triage 演示多轮下钻与播种埋题的评测设计。
 
 ## MCP 生态
 
@@ -225,7 +226,7 @@ sluice mcp --call mcp__filesystem__read_file --args '{"path": "langgraph_weekly/
 
 ## Status
 
-**alpha**。核心闭环、可靠性、评测、生态四层均已落地并有全量测试（366 tests）与 CI 门禁，API 仍可能变化。
+**alpha**。核心闭环、可靠性、评测、生态四层均已落地并有全量测试（380 tests）与 CI 门禁，API 仍可能变化。
 
 工程过程即文档：`docs/plans/` 保留 P0–P5 六个阶段的完整实现计划（含执行红线），可以完整复盘每一层是怎么一步步建起来的。
 

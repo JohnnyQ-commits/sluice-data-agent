@@ -29,14 +29,18 @@ rows = []
 random.seed(42)
 # 21 天窗口锚定系统日期（末日=昨天）："上周"（自然周）恒有完整数据，demo 无保质期（备案②）。
 # 量的分布让"近一周 vs 上一周"有可见差异：最近 7 天整体上量，周报能看出环比。
+# 渠道异常（Skill B 异常下钻的教学数据）：上周整体涨，但深圳暴跌——整体指标掩盖
+# 单一渠道崩盘，逐维度下钻才能定位。random 调用序列保持不变（倍率乘在抽样之后），
+# 行数与既有播种一致。
 END = _date.today() - timedelta(days=1)
 for offset in range(21):
     date = (END - timedelta(days=20 - offset)).isoformat()
-    bump = 1.6 if offset >= 14 else 1.0  # 最近 7 天上量
     for city in CITIES:
+        # 最近 7 天整体上量，但深圳反常暴跌
+        city_bump = (0.15 if city == "深圳" else 1.9) if offset >= 14 else 1.0
         for cat in CATEGORIES:
             for _ in range(random.randint(1, 4)):
-                rows.append((date, city, cat, round(random.uniform(20, 800) * bump, 2)))
+                rows.append((date, city, cat, round(random.uniform(20, 800) * city_bump, 2)))
 conn.executemany("insert into sales (sale_date, city, category, amount) values (?, ?, ?, ?)", rows)
 
 conn.execute("drop table if exists user_events")
