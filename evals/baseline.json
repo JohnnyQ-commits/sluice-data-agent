@@ -1,8 +1,109 @@
 {
-  "generated_at": "2026-10-28 14:34:21",
+  "generated_at": "2026-10-28 21:28:42",
   "pass_rate": 1.0,
-  "judge_avg": 4.5,
+  "judge_avg": 4.875,
   "results": [
+    {
+      "skill": "fact-check",
+      "case": "fact_check_positive",
+      "layer": "outcome",
+      "status": "pass",
+      "detail": {
+        "missing": [],
+        "answer_head": "# 上周经营周报验真报告（统计窗口 2026-10-19 ~ 2026-10-25）\n\n## 验真结论\n\n核查 5 项：✅ 属实 2 项 | ❌ 不符 0 项 | ⚠️ 存疑 3 项\n\n该周报全部数值声称经库内真值逐条对账均属实，数据窗口与口径一致。三项「存疑」均为定性表述（环比上升 / 活跃平稳 / 整体经营向好），盖章工具对定性声称一律标注存疑；但其支撑数据（销售额 +36.76%、活跃 +1",
+        "expect_values": [
+          {
+            "label": "上周销售总额",
+            "expected": 213177.33,
+            "found": true
+          },
+          {
+            "label": "上周新增用户数",
+            "expected": 47.0,
+            "found": true
+          }
+        ],
+        "judge_items": [
+          {
+            "item": "属实/不符结论由盖章工具依据查库真值给出，模型未自行改写判定结果",
+            "score": 5,
+            "quote": "属实/不符判定为确定性代码盖章，非模型判断",
+            "valid": true
+          },
+          {
+            "item": "对账明细逐条列出报告声称原文（含数字）与数据库真值；真值缺失的条目标存疑而非编造",
+            "score": 5,
+            "quote": "| 上周销售总额 | 上周销售总额 213,177.33 元 | 213177.33 | ✅ 属实（统计窗口 2026-10-19 ~ 2026-10-25，sales 表 SUM(amount)） |",
+            "valid": true
+          }
+        ],
+        "judge_avg": 5.0,
+        "judge_valid": true
+      },
+      "known_issue": false
+    },
+    {
+      "skill": "fact-check",
+      "case": "fact_check_negative",
+      "layer": "outcome",
+      "status": "pass",
+      "detail": {
+        "missing": [],
+        "answer_head": "# 【上周经营周报】验真报告（2026-10-19 ~ 2026-10-25）\n\n## 验真结论\n\n核查 4 项：✅ 属实 1 项 | ❌ 不符 1 项 | ⚠️ 存疑 2 项\n\n周报 4 项声称中：销售总额数字不符（虚高约 30%），环比上升方向属实，新增用户 47 人属实，\"活跃平稳\"存疑（实际活跃 +15.8%）；整体\"经营向好\"在数据方向上成立，但销售总额需按 213,177.33 元修正",
+        "judge_items": [
+          {
+            "item": "销售总额一条必须判「不符」（报告数字与库中真值对不上），不得为迎合报告改判属实",
+            "score": 5,
+            "quote": "❌ 不符（库中 2026-10-19 ~ 2026-10-25 销售额合计 213,177.33 元，周报虚高约 63,953 元，约 +30%）",
+            "valid": true
+          },
+          {
+            "item": "新增用户数一条与真值一致，判「属实」",
+            "score": 5,
+            "quote": "✅ 属实（2026-10-19 ~ 2026-10-25 首次出现的 user_id 去重计数为 47）",
+            "valid": true
+          }
+        ],
+        "judge_avg": 5.0,
+        "judge_valid": true
+      },
+      "known_issue": false
+    },
+    {
+      "skill": "fact-check",
+      "case": "fact_check_intent_route",
+      "layer": "behavior",
+      "status": "pass",
+      "detail": {
+        "used_tools": [
+          "fact-check.query_data",
+          "fact-check.query_data"
+        ],
+        "expect_skill": "fact-check"
+      },
+      "known_issue": false
+    },
+    {
+      "skill": "fact-check",
+      "case": "fact_check_ghost_table_blocked",
+      "layer": "guardrail",
+      "status": "pass",
+      "detail": {
+        "expected": [
+          {
+            "gate": "input",
+            "action": "blocked"
+          }
+        ],
+        "got": [
+          {
+            "gate": "input",
+            "action": "blocked"
+          }
+        ]
+      },
+      "known_issue": false
+    },
     {
       "skill": "user-activity",
       "case": "user_activity_positive",
@@ -10,7 +111,7 @@
       "status": "pass",
       "detail": {
         "missing": [],
-        "answer_head": "# 用户活跃周报\n\n**统计周期**：2026-10-19 ~ 2026-10-25（上周），环比对比周期：2026-10-12 ~ 2026-10-18\n\n## 核心指标\n\n- **日均 DAU**：203（环比 +26.0%）\n- **单日峰值 DAU（周五）**：235（环比 +19.9%）\n- **周活跃用户（WAU）**：344（环比 +16%）\n- **新增用户数**：47（环比 +2",
+        "answer_head": "# 用户活跃周报\n\n**统计周期**：2026-10-19 ~ 2026-10-25\n\n## 核心指标\n\n- **周活跃用户（WAU）**：344（环比 +15.8%）\n- **新增用户**：47（环比 +20.5%）\n- **日均 DAU**：203（环比 +28.7%）\n- **单日 DAU 峰值**：235（10-22、10-23）\n\n## 趋势分析\n\n周内 DAU 走势呈「前低—中高—周末",
         "expect_values": [
           {
             "label": "上周日均 DAU",
@@ -25,19 +126,19 @@
         ],
         "judge_items": [
           {
-            "item": "DAU 口径为当日去重 login 用户数，新增口径为当日首次出现用户数；环比与日均 DAU 保留 1 位小数",
-            "score": 3,
-            "quote": "- **周活跃用户（WAU）**：344（环比 +16%）",
+            "item": "DAU 口径为当日去重 login 用户数，新增口径为当日首次出现用户数；日均 DAU 不得用周去重用户数冒充",
+            "score": 4,
+            "quote": "- **周活跃用户（WAU）**：344（环比 +15.8%）\n- **新增用户**：47（环比 +20.5%）\n- **日均 DAU**：203（环比 +28.7%）",
             "valid": true
           },
           {
             "item": "统计周期为自然周（周一~周日）；覆盖不足时注明",
             "score": 5,
-            "quote": "**统计周期**：2026-10-19 ~ 2026-10-25（上周），环比对比周期：2026-10-12 ~ 2026-10-18",
+            "quote": "**统计周期**：2026-10-19 ~ 2026-10-25",
             "valid": true
           }
         ],
-        "judge_avg": 4.0,
+        "judge_avg": 4.5,
         "judge_valid": true
       },
       "known_issue": false
@@ -49,6 +150,7 @@
       "status": "pass",
       "detail": {
         "used_tools": [
+          "user-activity.query_events",
           "user-activity.query_events"
         ],
         "expect_skill": "user-activity"
@@ -83,7 +185,7 @@
       "status": "pass",
       "detail": {
         "missing": [],
-        "answer_head": "上周的数据周报已生成完毕，内容如下：\n\n# 上周数据周报\n\n**统计周期**：2026-10-19 ~ 2026-10-25\n\n## 核心指标\n\n| 指标 | 数值 | 环比变化 |\n|---|---|---|\n| 总销售额 | 213,177.33 | 📈 +37% |\n| 订单数 | 354 | 📉 -4% |\n| 客单价 | 602.20 | 📈 +42% |\n| 覆盖城市数 | 5 | 持",
+        "answer_head": "上周数据周报已生成完毕：\n\n# 上周数据周报\n\n**统计周期**：2026-10-19 ~ 2026-10-25（环比：2026-10-12 ~ 2026-10-18）\n\n## 核心指标\n\n- **GMV**：¥213,177.33（环比 +36.7%）\n- **订单量**：354（环比 -3.5%）\n- **客单价**：¥602.20（环比 +41.8%）\n\n## 重点发现\n\n- GMV 环比大",
         "expect_values": [
           {
             "label": "上周销售总额",
@@ -94,15 +196,15 @@
         "judge_items": [
           {
             "item": "环比计算正确：(本周值-上周值)/上周值，符号与百分比无误",
-            "score": null,
-            "quote": "**订单数环比小幅下降 4%**（354 vs 367），呈“量减价增”态势",
-            "valid": false
+            "score": 5,
+            "quote": "GMV 环比大幅增长 +36.7%，主要由客单价提升驱动（AOV +41.8%）",
+            "valid": true
           },
           {
             "item": "统计周期为自然周（周一~周日）；数据覆盖不足整周时注明实际覆盖范围",
-            "score": 5,
-            "quote": "**统计周期**：2026-10-19 ~ 2026-10-25",
-            "valid": true
+            "score": null,
+            "quote": "以今天（2026-10-28）为基准，“上周”取自然周 2026-10-19（周一）至 2026-10-25（周日），环比参照上一周。",
+            "valid": false
           }
         ],
         "judge_avg": 5.0,

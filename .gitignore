@@ -8,6 +8,7 @@ __pycache__/
 data/
 audit/
 evals/reports/
+evals_rebuild.log
 .idea/
 web_server*.log
 .mcp.json
